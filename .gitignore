@@ -1,0 +1,10 @@
+.DS_Store
+/build/
+/.kas/
+/downloads/
+/sstate-cache/
+__pycache__/
+*.pyc
+/.cache/
+/layers/
+/artifacts/
