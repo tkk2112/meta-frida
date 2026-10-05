@@ -1,0 +1,40 @@
+header:
+  version: 19
+
+machine: qemuarm64
+distro: poky
+
+target:
+  - core-image-minimal
+
+repos:
+  bitbake:
+    url: https://git.openembedded.org/bitbake
+    commit: fae9db3168dbff1b8c76fe9c6726a9687ff97514
+    layers: {}
+
+  openembedded-core:
+    url: https://git.openembedded.org/openembedded-core
+    commit: ef022bf82d79015802309d14c28b13373ebe53f5
+    layers:
+      meta:
+
+  meta-yocto:
+    url: https://git.yoctoproject.org/meta-yocto
+    commit: 1b132647002eea43a2c7a7f857f63f42dacbc26c
+    layers:
+      meta-poky:
+
+  meta-frida:
+    path: /repo
+
+local_conf_header:
+  meta-frida: |
+    DL_DIR = "${TOPDIR}/../downloads"
+    SSTATE_DIR = "${TOPDIR}/../sstate-cache"
+
+    BB_HASHSERVE = "auto"
+    BB_SIGNATURE_HANDLER = "OEEquivHash"
+    BB_HASHSERVE_UPSTREAM = "wss://hashserv.yoctoproject.org/ws"
+
+    SSTATE_MIRRORS ?= "file://.* http://sstate.yoctoproject.org/all/PATH;downloadfilename=PATH"
