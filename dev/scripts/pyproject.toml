@@ -1,0 +1,42 @@
+[project]
+name = "meta-frida"
+version = "0.1.0"
+requires-python = ">=3.13"
+dependencies = [
+    "kas>=5.5",
+    "oelint-adv",
+    "ruff",
+    "ty",
+]
+
+[tool.uv]
+package = false
+
+[tool.ruff]
+line-length = 120
+src = ["src", "tests"]
+
+[tool.ruff.lint]
+select = [
+  "ARG",
+  "B",
+  "C90",
+  "E",
+  "F",
+  "I",
+  "LOG",
+  "N",
+  "PERF",
+  "PT",
+  "PTH",
+  "RET",
+  "RUF",
+  "SIM",
+  "TRY",
+  "UP",
+  "W",
+]
+ignore = ["TRY003"]
+
+[tool.ruff.lint.mccabe]
+max-complexity = 10

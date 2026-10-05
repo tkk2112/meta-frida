@@ -1,0 +1,10 @@
+{
+  "oelint.newline.eof": "",
+  "oelint.spaces.emptyline": "",
+  "oelint.spaces.linecont": "",
+  "oelint.spaces.lineend": "",
+  "oelint.tabs.notabs": "",
+  "oelint.vars.multilineident": "",
+  "oelint.vars.listappend": "",
+  "oelint.vars.overrideappend": ""
+}
