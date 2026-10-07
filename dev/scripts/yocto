@@ -2,109 +2,118 @@
 
 set -euo pipefail
 
-root="$(git rev-parse --show-toplevel)"
+SCRIPT_DIR="$(
+    cd -- "$(dirname -- "$0")" &&
+        pwd
+)"
+
+# shellcheck source=lib/bootstrap.sh
+source "$SCRIPT_DIR/lib/bootstrap.sh"
+
+root="$ROOT"
+image="$YOCTO_IMAGE"
+work_volume="$YOCTO_WORK_VOLUME"
 
 if [[ -n "${CONTAINER_ENGINE:-}" ]]; then
-  engine="$CONTAINER_ENGINE"
+    engine="$CONTAINER_ENGINE"
 elif command -v podman >/dev/null 2>&1; then
-  engine=podman
+    engine=podman
 elif command -v docker >/dev/null 2>&1; then
-  engine=docker
+    engine=docker
 else
-  echo "Neither podman nor docker found" >&2
-  exit 1
+    echo "error: neither podman nor docker was found in PATH" >&2
+    exit 1
 fi
 
 runtime_args=()
+
 if [[ "$(basename "$engine")" == "podman" ]]; then
-  runtime_args+=(--security-opt label=disable)
+    runtime_args+=(--security-opt label=disable)
 fi
 
-image="${YOCTO_IMAGE:-meta-frida-yocto:latest}"
-work_volume="${YOCTO_WORK_VOLUME:-meta-frida-yocto-work}"
-
 "$engine" build \
-  --build-arg KAS_VERSION=5.5 \
-  -t "$image" \
-  -f "$root/dev/containers/yocto/Dockerfile" \
-  "$root"
+    --build-arg "KAS_VERSION=$KAS_VERSION" \
+    -t "$image" \
+    -f "$root/dev/containers/yocto/Dockerfile" \
+    "$root"
 
 if ! "$engine" volume inspect "$work_volume" >/dev/null 2>&1; then
-  "$engine" volume create "$work_volume" >/dev/null
+    "$engine" volume create "$work_volume" >/dev/null
 fi
 
 builder_record="$(
-  "$engine" run \
-    --rm \
-    "${runtime_args[@]}" \
-    --entrypoint /usr/bin/getent \
-    "$image" \
-    passwd builder
+    "$engine" run \
+        --rm \
+        "${runtime_args[@]}" \
+        --entrypoint /usr/bin/getent \
+        "$image" \
+        passwd builder
 )"
 
 if [[ -z "$builder_record" ]]; then
-  echo "The kas image does not contain the expected 'builder' user" >&2
-  exit 1
+    echo "error: $image does not contain the expected 'builder' user" >&2
+    exit 1
 fi
 
 IFS=: read -r _ _ builder_uid builder_gid _ builder_home _ <<<"$builder_record"
 
 if [[ ! "$builder_uid" =~ ^[0-9]+$ || ! "$builder_gid" =~ ^[0-9]+$ ]]; then
-  echo "Unable to determine builder UID/GID from: $builder_record" >&2
-  exit 1
+    echo "error: unable to determine builder UID/GID from:" >&2
+    echo "  $builder_record" >&2
+    exit 1
 fi
 
 kas_path="$(
-  "$engine" run \
-    --rm \
-    "${runtime_args[@]}" \
-    --entrypoint /bin/sh \
-    "$image" \
-    -c 'command -v kas'
+    "$engine" run \
+        --rm \
+        "${runtime_args[@]}" \
+        --entrypoint /bin/sh \
+        "$image" \
+        -c 'command -v kas'
 )"
 
 if [[ -z "$kas_path" ]]; then
-  echo "Unable to locate kas in $image" >&2
-  exit 1
+    echo "error: unable to locate kas in $image" >&2
+    exit 1
 fi
 
 "$engine" run \
-  --rm \
-  "${runtime_args[@]}" \
-  --user 0:0 \
-  --entrypoint /bin/sh \
-  -v "$work_volume:/work:rw" \
-  "$image" \
-  -ec "chown $builder_uid:$builder_gid /work"
+    --rm \
+    "${runtime_args[@]}" \
+    --user 0:0 \
+    --entrypoint /bin/sh \
+    -v "$work_volume:/work:rw" \
+    "$image" \
+    -ec "chown $builder_uid:$builder_gid /work"
 
 "$engine" run \
-  --rm \
-  "${runtime_args[@]}" \
-  --user "$builder_uid:$builder_gid" \
-  --entrypoint /bin/sh \
-  -e "HOME=$builder_home" \
-  -v "$work_volume:/work:rw" \
-  "$image" \
-  -ec '
-    touch /work/.meta-frida-write-test
-    rm /work/.meta-frida-write-test
-  '
+    --rm \
+    "${runtime_args[@]}" \
+    --user "$builder_uid:$builder_gid" \
+    --entrypoint /bin/sh \
+    -e "HOME=$builder_home" \
+    -v "$work_volume:/work:rw" \
+    "$image" \
+    -ec '
+        touch /work/.meta-frida-write-test
+        rm /work/.meta-frida-write-test
+    '
 
 exec "$engine" run \
-  --rm \
-  --init \
-  "${runtime_args[@]}" \
-  --user "$builder_uid:$builder_gid" \
-  --entrypoint "$kas_path" \
-  -e "HOME=$builder_home" \
-  -e USER=builder \
-  -e LOGNAME=builder \
-  -e KAS_WORK_DIR=/work \
-  -e GIT_CONFIG_COUNT=1 \
-  -e GIT_CONFIG_KEY_0=safe.directory \
-  -e GIT_CONFIG_VALUE_0=/repo \
-  -v "$root:/repo:ro" \
-  -v "$work_volume:/work:rw" \
-  -w /repo \
-  "$image" \
-  "$@"
+    --rm \
+    --init \
+    "${runtime_args[@]}" \
+    --user "$builder_uid:$builder_gid" \
+    --entrypoint "$kas_path" \
+    -e "HOME=$builder_home" \
+    -e USER=builder \
+    -e LOGNAME=builder \
+    -e KAS_WORK_DIR=/work \
+    -e GIT_CONFIG_COUNT=1 \
+    -e GIT_CONFIG_KEY_0=safe.directory \
+    -e GIT_CONFIG_VALUE_0=/repo \
+    -v "$root:/repo:ro" \
+    -v "$work_volume:/work:rw" \
+    -w /repo \
+    "$image" \
+    "$@"
