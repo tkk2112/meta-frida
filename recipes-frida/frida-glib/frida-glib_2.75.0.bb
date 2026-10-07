@@ -7,14 +7,15 @@ HOMEPAGE = "https://github.com/frida/glib"
 LICENSE = "LGPL-2.1-or-later"
 LIC_FILES_CHKSUM = "file://COPYING;md5=41890f71f740302b785c27661123bff5"
 
+inherit frida-source meson pkgconfig
+
 SRC_URI = " \
-    git://github.com/frida/glib.git;protocol=https;nobranch=1;name=glib \
-    git://gitlab.gnome.org/GNOME/gvdb.git;protocol=https;nobranch=1;name=gvdb;destsuffix=${BP}/subprojects/gvdb \
+    ${FRIDA_SOURCE_URI};name=glib \
+    ${FRIDA_GLIB_GVDB_URI};name=gvdb;destsuffix=${BP}/subprojects/gvdb \
 "
 
-SRCREV_glib = "e0cc7c6f0d88f47e4dee4607df085d08c89b8a6a"
-SRCREV_gvdb = "0854af0fdb6d527a8d1999835ac2c5059976c210"
-
+SRCREV_glib = "${FRIDA_SOURCE_SRCREV}"
+SRCREV_gvdb = "${FRIDA_GLIB_GVDB_SRCREV}"
 SRCREV_FORMAT = "glib_gvdb"
 
 PV = "2.75.0+git"

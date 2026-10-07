@@ -7,9 +7,6 @@ HOMEPAGE = "https://github.com/frida/libgee"
 LICENSE = "LGPL-2.1-only"
 LIC_FILES_CHKSUM = "file://COPYING;md5=fbc093901857fcd118f065f900982c24"
 
-SRC_URI = "git://github.com/frida/libgee.git;protocol=https;nobranch=1"
-SRCREV = "ad17ed847039469fcc2dc711ecfee2bbf7d2bf87"
-
 PV = "0.20.6+git"
 
 DEPENDS = "\
@@ -17,7 +14,7 @@ DEPENDS = "\
     frida-vala-native \
 "
 
-inherit meson pkgconfig
+inherit frida-source meson pkgconfig
 
 FRIDA_DEPS_PREFIX = "${libdir}/frida"
 

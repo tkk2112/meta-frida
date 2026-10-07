@@ -7,10 +7,7 @@ HOMEPAGE = "https://github.com/frida/libffi"
 LICENSE = "MIT"
 LIC_FILES_CHKSUM = "file://LICENSE;md5=32c0d09a0641daf4903e5d61cc8f23a8"
 
-SRC_URI = "git://github.com/frida/libffi.git;protocol=https;branch=main"
-SRCREV = "3fe3257235cc9ffd192e1cd567f1bdfff751fa3e"
-
-inherit meson pkgconfig
+inherit frida-source meson pkgconfig
 
 FRIDA_DEPS_PREFIX = "${libdir}/frida"
 

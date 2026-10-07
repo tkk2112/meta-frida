@@ -7,14 +7,11 @@ HOMEPAGE = "https://github.com/frida/json-glib"
 LICENSE = "LGPL-2.1-or-later"
 LIC_FILES_CHKSUM = "file://COPYING;md5=41890f71f740302b785c27661123bff5"
 
-SRC_URI = "git://github.com/frida/json-glib.git;protocol=https;nobranch=1"
-SRCREV = "1a39cbe151b02c4192987c8fcc98997a59db2154"
-
 PV = "1.8.0+git"
 
 DEPENDS = "frida-glib"
 
-inherit meson pkgconfig
+inherit frida-source meson pkgconfig
 
 FRIDA_DEPS_PREFIX = "${libdir}/frida"
 

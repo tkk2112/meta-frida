@@ -7,12 +7,9 @@ HOMEPAGE = "https://github.com/frida/pcre2"
 LICENSE = "BSD-3-Clause"
 LIC_FILES_CHKSUM = "file://LICENCE;md5=41bfb977e4933c506588724ce69bf5d2"
 
-SRC_URI = "git://github.com/frida/pcre2.git;protocol=https;branch=main"
-SRCREV = "b47486922fdc3486499b310dc9cf903449700474"
-
 PV = "10.41+git"
 
-inherit meson pkgconfig
+inherit frida-source meson pkgconfig
 
 FRIDA_DEPS_PREFIX = "${libdir}/frida"
 

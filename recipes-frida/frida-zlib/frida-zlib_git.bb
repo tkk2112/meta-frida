@@ -7,12 +7,9 @@ HOMEPAGE = "https://github.com/frida/zlib"
 LICENSE = "Zlib"
 LIC_FILES_CHKSUM = "file://zlib.h;beginline=6;endline=23;md5=5377232268e952e9ef63bc555f7aa6c0"
 
-SRC_URI = "git://github.com/frida/zlib.git;protocol=https;nobranch=1"
-SRCREV = "171a3eacaea8b731ef1fc586e7777b77742e2a1d"
-
 PV = "1.3.1+git"
 
-inherit meson pkgconfig
+inherit frida-source meson pkgconfig
 
 FRIDA_DEPS_PREFIX = "${libdir}/frida"
 

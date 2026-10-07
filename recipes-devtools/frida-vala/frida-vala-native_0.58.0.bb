@@ -7,12 +7,9 @@ HOMEPAGE = "https://github.com/frida/vala"
 LICENSE = "LGPL-2.1-or-later"
 LIC_FILES_CHKSUM = "file://compiler/valacompiler.vala;beginline=1;endline=22;md5=2f745017010224f101a5cbc5eaa55926"
 
-SRC_URI = "git://github.com/frida/vala.git;protocol=https;branch=main"
-SRCREV = "172348fa9123ff4a95d541c5f9e56837434c4b6e"
-
 PV = "0.58.0+git"
 
-inherit meson pkgconfig vala native
+inherit frida-source meson pkgconfig vala native
 
 DEPENDS += "\
     glib-2.0-native \
