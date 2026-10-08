@@ -6,6 +6,7 @@ dependencies = [
     "gitpython",
     "kas>=5.5",
     "oelint-adv",
+    "pre-commit>=4.6.2",
     "ruff",
     "tomlkit",
     "ty",

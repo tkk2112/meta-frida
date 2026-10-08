@@ -1,0 +1,16 @@
+repos:
+  - repo: local
+    hooks:
+      - id: check-format
+        name: Check BitBake and Python formatting
+        entry: make check-format
+        language: system
+        pass_filenames: false
+        always_run: true
+
+      - id: lint
+        name: Lint BitBake and Python
+        entry: make lint
+        language: system
+        pass_filenames: false
+        always_run: true
