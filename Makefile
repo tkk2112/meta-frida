@@ -10,7 +10,8 @@ UV_SYNC := uv sync \
 	--python $(PYTHON_VERSION)
 
 PYTHON_SCRIPTS := \
-	dev/scripts/update_frida.py
+	dev/scripts/update_frida.py \
+	dev/scripts/tests/test_releng_meson.py
 
 OELINT := $(UV_RUN) oelint-adv --quiet --release $(OELINT_RELEASE)
 

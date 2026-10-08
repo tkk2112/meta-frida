@@ -5,6 +5,7 @@ import importlib
 import re
 import sys
 import tempfile
+import tomllib
 from collections.abc import Mapping
 from pathlib import Path
 from typing import Any
@@ -345,6 +346,65 @@ def package_source(
     return url, revision
 
 
+def read_releng_meson_options(
+    releng_repository: Path,
+    packages: Mapping[str, Any],
+) -> dict[str, list[tuple[str, str]]]:
+    # Read the TOML from the same pinned releng checkout used to resolve SHAs.
+    # Keep `when` predicates verbatim so BitBake can select for its target.
+    manifest_path = releng_repository / "deps.toml"
+    with manifest_path.open("rb") as stream:
+        manifest = tomllib.load(stream)
+
+    result: dict[str, list[tuple[str, str]]] = {}
+    for identifier, package in packages.items():
+        entry = manifest.get(identifier)
+        if entry is None:
+            msg = f"{identifier}: missing entry in pinned releng/deps.toml"
+            raise RuntimeError(msg)
+
+        if not isinstance(entry, dict):
+            msg = f"{identifier}: expected a table in pinned releng/deps.toml"
+            raise TypeError(msg)
+
+        if entry.get("url") != str(package.url) or entry.get("version") != str(package.version):
+            msg = f"{identifier}: releng.deps and deps.toml disagree about source pins"
+            raise RuntimeError(msg)
+
+        options = entry.get("options", [])
+        if not isinstance(options, list):
+            msg = f"{identifier}: expected a list of Meson options"
+            raise TypeError(msg)
+
+        parsed: list[tuple[str, str]] = []
+        for option in options:
+            if isinstance(option, str):
+                value, when = option, ""
+            elif isinstance(option, dict) and set(option) == {"value", "when"}:
+                value, when = option["value"], option["when"]
+                if not isinstance(value, str) or not isinstance(when, str):
+                    msg = f"{identifier}: invalid conditional Meson option {option!r}"
+                    raise TypeError(msg)
+            else:
+                msg = f"{identifier}: unsupported Meson option {option!r}"
+                raise RuntimeError(msg)
+
+            # All options are persisted, including those not applicable to Linux.
+            # No shell parsing, eval, or host-side conditional selection happens here.
+            parsed.append((value, " ".join(when.split())))
+
+        result[identifier] = parsed
+
+    return result
+
+
+def bitbake_literal(value: str) -> str:
+    if any(character in value for character in ('"', "\\", "\n", "\r")):
+        msg = f"cannot serialize Meson option safely in BitBake: {value!r}"
+        raise RuntimeError(msg)
+    return f'"{value}"'
+
+
 def format_lock(
     *,
     version: str,
@@ -353,6 +413,7 @@ def format_lock(
     releng_revision: str,
     components: Mapping[str, tuple[str, str]],
     packages: Mapping[str, Any],
+    meson_options: Mapping[str, list[tuple[str, str]]],
     gvdb_url: str,
     gvdb_revision: str,
 ) -> str:
@@ -398,6 +459,18 @@ def format_lock(
                 f'FRIDA_DEP_SRCREV[{identifier}] = "{revision}"',
             ]
         )
+
+    # Stable indexed entries retain the exact upstream ordering and predicates.
+    # The recipe class resolves predicates using Yocto target metadata.
+    lines.append("")
+    for identifier in sorted(meson_options):
+        options = meson_options[identifier]
+        lines.append(f'FRIDA_DEP_MESON_COUNT[{identifier}] = "{len(options)}"')
+        for index, (value, when) in enumerate(options):
+            key = f"{identifier}-{index:03d}"
+            lines.append(f"FRIDA_DEP_MESON_ARG[{key}] = {bitbake_literal(value)}")
+            if when:
+                lines.append(f"FRIDA_DEP_MESON_WHEN[{key}] = {bitbake_literal(when)}")
 
     lines.extend(
         [
@@ -528,6 +601,10 @@ def generate_lock(
         )
 
         print(f"  packages:       {len(packages)}")
+        meson_options = read_releng_meson_options(
+            Path(releng_worktree),
+            packages,
+        )
 
         if verbose:
             print("\nDependency pins")
@@ -563,6 +640,7 @@ def generate_lock(
             releng_revision=releng_revision,
             components=components,
             packages=packages,
+            meson_options=meson_options,
             gvdb_url=gvdb_url,
             gvdb_revision=gvdb_revision,
         )

@@ -58,7 +58,8 @@ def frida_source_value(d, field):
 
     return value
 
-
+FRIDA_SOURCE_KIND = "${@frida_source_identity(d)[0]}"
+FRIDA_SOURCE_NAME = "${@frida_source_identity(d)[1]}"
 FRIDA_SOURCE_URI = "${@frida_source_value(d, 'URI')}"
 FRIDA_SOURCE_SRCREV = "${@frida_source_value(d, 'SRCREV')}"
 

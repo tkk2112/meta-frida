@@ -9,7 +9,7 @@ LIC_FILES_CHKSUM = "file://LICENCE;md5=41bfb977e4933c506588724ce69bf5d2"
 
 PV = "10.41+git"
 
-inherit frida-source meson pkgconfig
+inherit frida-dep-meson
 
 FRIDA_DEPS_PREFIX = "${libdir}/frida"
 
@@ -20,8 +20,6 @@ EXTRA_OEMESON = " \
     --includedir=include \
     --datadir=share \
     -Ddefault_library=static \
-    -Dgrep=false \
-    -Dtest=false \
 "
 
 FILES:${PN}-dev += "\
