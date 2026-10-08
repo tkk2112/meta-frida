@@ -9,18 +9,7 @@ LIC_FILES_CHKSUM = "file://zlib.h;beginline=6;endline=23;md5=5377232268e952e9ef6
 
 PV = "1.3.1+git"
 
-inherit frida-source meson pkgconfig
-
-FRIDA_DEPS_PREFIX = "${libdir}/frida"
-
-EXTRA_OEMESON = " \
-    --prefix=${FRIDA_DEPS_PREFIX} \
-    --bindir=bin \
-    --libdir=lib \
-    --includedir=include \
-    --datadir=share \
-    -Ddefault_library=static \
-"
+inherit frida-dep-meson
 
 FILES:${PN}-dev += "\
     ${FRIDA_DEPS_PREFIX}/include \

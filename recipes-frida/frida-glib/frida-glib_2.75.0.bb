@@ -7,7 +7,7 @@ HOMEPAGE = "https://github.com/frida/glib"
 LICENSE = "LGPL-2.1-or-later"
 LIC_FILES_CHKSUM = "file://COPYING;md5=41890f71f740302b785c27661123bff5"
 
-inherit frida-source meson pkgconfig
+inherit frida-dep-meson
 
 SRC_URI = " \
     ${FRIDA_SOURCE_URI};name=glib \
@@ -26,25 +26,10 @@ DEPENDS = " \
     frida-zlib \
 "
 
-inherit meson pkgconfig
-
-FRIDA_DEPS_PREFIX = "${libdir}/frida"
-
 PKG_CONFIG_PATH:prepend = "${STAGING_LIBDIR}/frida/lib/pkgconfig:"
 
-EXTRA_OEMESON = " \
-    --prefix=${FRIDA_DEPS_PREFIX} \
-    --bindir=bin \
-    --libdir=lib \
+EXTRA_OEMESON:append = " \
     --libexecdir=libexec \
-    --includedir=include \
-    --datadir=share \
-    -Ddefault_library=static \
-    -Dcocoa=disabled \
-    -Dselinux=disabled \
-    -Dxattr=false \
-    -Dlibmount=disabled \
-    -Dtests=false \
 "
 
 FILES:${PN}-dev += " \

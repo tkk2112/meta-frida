@@ -7,20 +7,7 @@ HOMEPAGE = "https://github.com/frida/libffi"
 LICENSE = "MIT"
 LIC_FILES_CHKSUM = "file://LICENSE;md5=32c0d09a0641daf4903e5d61cc8f23a8"
 
-inherit frida-source meson pkgconfig
-
-FRIDA_DEPS_PREFIX = "${libdir}/frida"
-
-EXTRA_OEMESON = " \
-    --prefix=${FRIDA_DEPS_PREFIX} \
-    --bindir=bin \
-    --libdir=lib \
-    --includedir=include \
-    --datadir=share \
-    -Ddefault_library=static \
-    -Dexe_static_tramp=false \
-    -Dtests=false \
-"
+inherit frida-dep-meson
 
 FILES:${PN}-dev += "\
     ${FRIDA_DEPS_PREFIX}/include \

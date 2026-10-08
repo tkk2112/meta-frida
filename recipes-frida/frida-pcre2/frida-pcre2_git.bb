@@ -11,17 +11,6 @@ PV = "10.41+git"
 
 inherit frida-dep-meson
 
-FRIDA_DEPS_PREFIX = "${libdir}/frida"
-
-EXTRA_OEMESON = " \
-    --prefix=${FRIDA_DEPS_PREFIX} \
-    --bindir=bin \
-    --libdir=lib \
-    --includedir=include \
-    --datadir=share \
-    -Ddefault_library=static \
-"
-
 FILES:${PN}-dev += "\
     ${FRIDA_DEPS_PREFIX}/include \
     ${FRIDA_DEPS_PREFIX}/lib/pkgconfig \

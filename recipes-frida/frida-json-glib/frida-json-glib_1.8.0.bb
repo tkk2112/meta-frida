@@ -11,24 +11,9 @@ PV = "1.8.0+git"
 
 DEPENDS = "frida-glib"
 
-inherit frida-source meson pkgconfig
-
-FRIDA_DEPS_PREFIX = "${libdir}/frida"
+inherit frida-dep-meson
 
 PKG_CONFIG_PATH:prepend = "${STAGING_LIBDIR}/frida/lib/pkgconfig:"
-
-EXTRA_OEMESON = "\
-    --prefix=${FRIDA_DEPS_PREFIX} \
-    --bindir=bin \
-    --libdir=lib \
-    --includedir=include \
-    --datadir=share \
-    -Ddefault_library=static \
-    -Dintrospection=disabled \
-    -Dgtk_doc=disabled \
-    -Dtests=false \
-    -Dnls=disabled \
-"
 
 FILES:${PN} += "\
     ${FRIDA_DEPS_PREFIX}/bin \

@@ -14,21 +14,11 @@ DEPENDS = "\
     frida-vala-native \
 "
 
-inherit frida-source meson pkgconfig
-
-FRIDA_DEPS_PREFIX = "${libdir}/frida"
+inherit frida-dep-meson
 
 PKG_CONFIG_PATH:prepend = "${STAGING_LIBDIR}/frida/lib/pkgconfig:"
 
-EXTRA_OEMESON = " \
-    --prefix=${FRIDA_DEPS_PREFIX} \
-    --bindir=bin \
-    --libdir=lib \
-    --includedir=include \
-    --datadir=share \
-    -Ddefault_library=static \
-    -Ddisable-internal-asserts=true \
-    -Ddisable-introspection=true \
+EXTRA_OEMESON:append = " \
     --native-file=${WORKDIR}/frida-vala.ini \
 "
 
