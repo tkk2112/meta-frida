@@ -16,7 +16,7 @@ from git.exc import GitCommandError
 
 ROOT = Path(__file__).resolve().parents[2]
 
-LOCK_FILE = ROOT / "conf/include/frida-lock.inc"
+LOCK_FILE = ROOT / "conf/include/frida_lock.inc"
 
 FRIDA_REPO_URL = "https://github.com/frida/frida.git"
 

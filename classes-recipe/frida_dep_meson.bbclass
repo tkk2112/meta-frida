@@ -1,6 +1,6 @@
 # SPDX-License-Identifier: MIT
 
-inherit frida-source meson pkgconfig
+inherit frida_source meson pkgconfig
 
 FRIDA_DEPS_PREFIX ??= "${libdir}/frida"
 EXTRA_OEMESON:append = " \
@@ -14,13 +14,12 @@ EXTRA_OEMESON:append = " \
 FRIDA_MESON_SKIP_ARGS ??= ""
 FRIDA_MESON_OPTIMIZED ??= "${@'0' if d.getVar('DEBUG_BUILD') == '1' else '1'}"
 
-
 def frida_meson_condition(expression, d):
     import ast
 
     target_os = (d.getVar("TARGET_OS") or "").split("-")[0]
     if target_os != "linux":
-        bb.fatal("%s: frida-dep-meson currently supports hosted Linux only" % d.getVar("PN"))
+        bb.fatal("%s: frida_dep_meson currently supports hosted Linux only" % d.getVar("PN"))
 
     arch = d.getVar("TARGET_ARCH")
     machine = {
@@ -85,11 +84,11 @@ def frida_meson_arguments(d):
     identifier = d.getVar("FRIDA_SOURCE_NAME")
 
     if kind != "DEP":
-        bb.fatal("%s: frida-dep-meson is for releng dependencies only" % d.getVar("PN"))
+        bb.fatal("%s: frida_dep_meson is for releng dependencies only" % d.getVar("PN"))
 
     count = d.getVarFlag("FRIDA_DEP_MESON_COUNT", identifier)
     if count is None:
-        bb.fatal("%s: no Meson option metadata for %s; regenerate frida-lock.inc" % (d.getVar("PN"), identifier))
+        bb.fatal("%s: no Meson option metadata for %s; regenerate frida_lock.inc" % (d.getVar("PN"), identifier))
 
     skip = set((d.getVar("FRIDA_MESON_SKIP_ARGS") or "").split())
     result = []
@@ -144,6 +143,7 @@ def frida_meson_validate_options(d):
         bb.fatal("%s: duplicate Meson options: %s" % (d.getVar("PN"), details))
 
 
+# nooelint: oelint.task.noanonpython Parse-time evaluation of upstream Meson metadata
 python __anonymous() {
     options = frida_meson_arguments(d)
     if options:

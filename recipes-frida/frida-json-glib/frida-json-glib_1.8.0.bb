@@ -7,11 +7,11 @@ HOMEPAGE = "https://github.com/frida/json-glib"
 LICENSE = "LGPL-2.1-or-later"
 LIC_FILES_CHKSUM = "file://COPYING;md5=41890f71f740302b785c27661123bff5"
 
-PV = "1.8.0+git"
-
 DEPENDS = "frida-glib"
 
-inherit frida-dep-meson
+PV = "1.8.0+git"
+
+inherit frida_dep_meson
 
 PKG_CONFIG_PATH:prepend = "${STAGING_LIBDIR}/frida/lib/pkgconfig:"
 
@@ -35,7 +35,7 @@ do_configure:prepend() {
             pkg-config --variable=prefix "$dependency"
         )"
 
-        test "$resolved" = "/usr/lib/frida" || \
+        test "$resolved" = "${FRIDA_DEPS_PREFIX}" || \
             bbfatal "$dependency resolved to unexpected prefix: $resolved"
     done
 }

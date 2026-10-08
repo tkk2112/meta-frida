@@ -9,7 +9,7 @@ LIC_FILES_CHKSUM = "file://zlib.h;beginline=6;endline=23;md5=5377232268e952e9ef6
 
 PV = "1.3.1+git"
 
-inherit frida-dep-meson
+inherit frida_dep_meson
 
 FILES:${PN}-dev += "\
     ${FRIDA_DEPS_PREFIX}/include \

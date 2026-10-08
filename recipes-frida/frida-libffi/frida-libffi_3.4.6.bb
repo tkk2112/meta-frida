@@ -7,7 +7,7 @@ HOMEPAGE = "https://github.com/frida/libffi"
 LICENSE = "MIT"
 LIC_FILES_CHKSUM = "file://LICENSE;md5=32c0d09a0641daf4903e5d61cc8f23a8"
 
-inherit frida-dep-meson
+inherit frida_dep_meson
 
 FILES:${PN}-dev += "\
     ${FRIDA_DEPS_PREFIX}/include \

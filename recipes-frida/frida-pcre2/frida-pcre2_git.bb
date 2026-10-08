@@ -9,7 +9,7 @@ LIC_FILES_CHKSUM = "file://LICENCE;md5=41bfb977e4933c506588724ce69bf5d2"
 
 PV = "10.41+git"
 
-inherit frida-dep-meson
+inherit frida_dep_meson
 
 FILES:${PN}-dev += "\
     ${FRIDA_DEPS_PREFIX}/include \

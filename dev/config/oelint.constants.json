@@ -1,0 +1,27 @@
+{
+  "variables": {
+    "known": [
+      "FRIDA_VERSION",
+      "FRIDA_RELEASE_URI",
+      "FRIDA_RELEASE_SRCREV",
+      "FRIDA_RELENG_URI",
+      "FRIDA_RELENG_SRCREV",
+      "FRIDA_COMPONENT_URI",
+      "FRIDA_COMPONENT_SRCREV",
+      "FRIDA_DEP_URI",
+      "FRIDA_DEP_SRCREV",
+      "FRIDA_DEP_MESON_COUNT",
+      "FRIDA_DEP_MESON_ARG",
+      "FRIDA_DEP_MESON_WHEN",
+      "FRIDA_GLIB_GVDB_URI",
+      "FRIDA_GLIB_GVDB_SRCREV",
+      "FRIDA_SOURCE_KIND",
+      "FRIDA_SOURCE_NAME",
+      "FRIDA_DEPS_PREFIX",
+      "FRIDA_DEP",
+      "FRIDA_COMPONENT",
+      "FRIDA_MESON_SKIP_ARGS",
+      "FRIDA_MESON_OPTIMIZED"
+    ]
+  }
+}

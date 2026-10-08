@@ -1,6 +1,6 @@
 # SPDX-License-Identifier: MIT
 
-require conf/include/frida-lock.inc
+require conf/include/frida_lock.inc
 
 FRIDA_DEP ??= ""
 FRIDA_COMPONENT ??= ""

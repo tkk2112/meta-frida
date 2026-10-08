@@ -7,9 +7,18 @@ HOMEPAGE = "https://github.com/frida/glib"
 LICENSE = "LGPL-2.1-or-later"
 LIC_FILES_CHKSUM = "file://COPYING;md5=41890f71f740302b785c27661123bff5"
 
-inherit frida-dep-meson
+DEPENDS += "\
+    frida-libffi \
+    frida-pcre2 \
+    frida-zlib \
+"
 
-SRC_URI = " \
+PV = "2.75.0+git"
+
+inherit frida_dep_meson
+
+# nooelint: oelint.var.override - The additional GVDB source requires named SRC_URI entries
+SRC_URI = "\
     ${FRIDA_SOURCE_URI};name=glib \
     ${FRIDA_GLIB_GVDB_URI};name=gvdb;destsuffix=${BP}/subprojects/gvdb \
 "
@@ -18,25 +27,17 @@ SRCREV_glib = "${FRIDA_SOURCE_SRCREV}"
 SRCREV_gvdb = "${FRIDA_GLIB_GVDB_SRCREV}"
 SRCREV_FORMAT = "glib_gvdb"
 
-PV = "2.75.0+git"
-
-DEPENDS = " \
-    frida-libffi \
-    frida-pcre2 \
-    frida-zlib \
-"
-
 PKG_CONFIG_PATH:prepend = "${STAGING_LIBDIR}/frida/lib/pkgconfig:"
 
-EXTRA_OEMESON:append = " \
+EXTRA_OEMESON:append = "\
     --libexecdir=libexec \
 "
 
-FILES:${PN}-dev += " \
+FILES:${PN}-dev += "\
     ${FRIDA_DEPS_PREFIX} \
 "
 
-FILES:${PN}-staticdev += " \
+FILES:${PN}-staticdev += "\
     ${FRIDA_DEPS_PREFIX}/lib/*.a \
 "
 
@@ -47,7 +48,7 @@ do_configure:prepend() {
             pkg-config --variable=prefix "$dependency"
         )"
 
-        test "$resolved" = "/usr/lib/frida" || \
+        test "$resolved" = "${FRIDA_DEPS_PREFIX}" || \
             bbfatal "$dependency resolved to unexpected prefix: $resolved"
     done
 }

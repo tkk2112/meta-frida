@@ -7,15 +7,16 @@ HOMEPAGE = "https://github.com/frida/vala"
 LICENSE = "LGPL-2.1-or-later"
 LIC_FILES_CHKSUM = "file://compiler/valacompiler.vala;beginline=1;endline=22;md5=2f745017010224f101a5cbc5eaa55926"
 
+DEPENDS = "\
+    bison-native \
+    flex-native \
+    glib-2.0-native \
+"
+
 PV = "0.58.0+git"
 
-inherit frida-dep-meson vala native
-
-DEPENDS += "\
-    glib-2.0-native \
-    flex-native \
-    bison-native \
-"
+inherit frida_dep_meson vala
+inherit_defer native
 
 FRIDA_DEPS_PREFIX = "${libdir}/frida-vala"
 

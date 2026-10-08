@@ -7,34 +7,37 @@ HOMEPAGE = "https://github.com/frida/libgee"
 LICENSE = "LGPL-2.1-only"
 LIC_FILES_CHKSUM = "file://COPYING;md5=fbc093901857fcd118f065f900982c24"
 
-PV = "0.20.6+git"
-
 DEPENDS = "\
     frida-glib \
     frida-vala-native \
 "
 
-inherit frida-dep-meson
+PV = "0.20.6+git"
+
+SRC_URI:append = " \
+    file://frida-valac \
+    file://frida-vala.ini \
+"
+
+inherit frida_dep_meson
 
 PKG_CONFIG_PATH:prepend = "${STAGING_LIBDIR}/frida/lib/pkgconfig:"
 
-EXTRA_OEMESON:append = " \
-    --native-file=${WORKDIR}/frida-vala.ini \
+EXTRA_OEMESON:append = "\
+    --native-file=${B}/frida-vala.ini \
 "
-
 do_configure:prepend() {
-    cat > "${WORKDIR}/frida-valac" <<EOF
-#!/bin/sh
-exec "${STAGING_LIBDIR_NATIVE}/frida-vala/bin/valac" \
-    --vapidir="${STAGING_LIBDIR_NATIVE}/frida-vala/share/vala-0.58/vapi" \
-    "\$@"
-EOF
-    chmod 0755 "${WORKDIR}/frida-valac"
+    install -m 0755 "${WORKDIR}/frida-valac" "${B}/frida-valac"
+    install -m 0644 "${WORKDIR}/frida-vala.ini" "${B}/frida-vala.ini"
 
-    cat > "${WORKDIR}/frida-vala.ini" <<EOF
-[binaries]
-vala = '${WORKDIR}/frida-valac'
-EOF
+    sed -i \
+        -e "s|@VALAC@|${STAGING_LIBDIR_NATIVE}/frida-vala/bin/valac|g" \
+        -e "s|@VAPIDIR@|${STAGING_LIBDIR_NATIVE}/frida-vala/share/vala-0.58/vapi|g" \
+        "${B}/frida-valac"
+
+    sed -i \
+        -e "s|@FRIDA_VALAC@|${B}/frida-valac|g" \
+        "${B}/frida-vala.ini"
 
     for dependency in glib-2.0 gobject-2.0 gio-2.0; do
         resolved="$(
@@ -42,7 +45,7 @@ EOF
             pkg-config --variable=prefix "$dependency"
         )"
 
-        test "$resolved" = "/usr/lib/frida" || \
+        test "$resolved" = "${FRIDA_DEPS_PREFIX}" || \
             bbfatal "$dependency resolved to unexpected prefix: $resolved"
     done
 
