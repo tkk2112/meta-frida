@@ -1,0 +1,9 @@
+header:
+  version: 19
+
+local_conf_header:
+  gumjs-smoketest: |
+    PACKAGECONFIG:append:pn-frida-gum = " gumjs"
+
+    IMAGE_INSTALL:append = " frida-gumjs-smoketest"
+    TEST_SUITES:append = " frida_gumjs"
