@@ -1,16 +1,7 @@
 # SPDX-License-Identifier: MIT
 
-inherit frida_source meson pkgconfig
+inherit frida_meson
 
-FRIDA_DEPS_PREFIX ??= "${libdir}/frida"
-EXTRA_OEMESON:append = " \
-    --prefix=${FRIDA_DEPS_PREFIX} \
-    --bindir=bin \
-    --libdir=lib \
-    --includedir=include \
-    --datadir=share \
-    -Ddefault_library=static \
-"
 FRIDA_MESON_SKIP_ARGS ??= ""
 FRIDA_MESON_OPTIMIZED ??= "${@'0' if d.getVar('DEBUG_BUILD') == '1' else '1'}"
 
