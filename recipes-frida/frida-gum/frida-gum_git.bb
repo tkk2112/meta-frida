@@ -22,16 +22,27 @@ DEPENDS = "\
 PV = "${FRIDA_VERSION}+git"
 
 SRC_URI:append = " file://frida-linux.cross"
+
+PACKAGECONFIG ??= ""
+
+PACKAGECONFIG[gumjs] = "\
+  -Dgumjs=enabled -Dquickjs=enabled, \
+    -Dgumjs=disabled -Dquickjs=disabled, \
+    frida-quickjs frida-quickjs-native \
+"
+
 inherit frida_meson python3native
 
 MESON_CROSS_FILE:append:class-target = " --cross-file ${UNPACKDIR}/frida-linux.cross"
 
 PKG_CONFIG_PATH:prepend = "${STAGING_LIBDIR}/frida/lib/pkgconfig:"
 
+# GumJS builds a native quickcompile helper using native QuickJS.
+export EXTRA_NATIVE_PKGCONFIG_PATH = ":${STAGING_LIBDIR_NATIVE}/frida/lib/pkgconfig"
+
 EXTRA_OEMESON:append = "\
     -Dfrida_version=${FRIDA_VERSION} \
     -Dgumpp=disabled \
-    -Dgumjs=disabled \
     -Dinspector=disabled \
     -Dgraft_tool=disabled \
     -Dtests=disabled \
@@ -54,4 +65,12 @@ do_install:append() {
         bbfatal "Missing Frida Gum pkg-config metadata"
     test -f "${D}${FRIDA_DEPS_PREFIX}/include/frida-1.0/gum/gum.h" || \
         bbfatal "Missing Frida Gum C API headers"
+
+    if ${@bb.utils.contains('PACKAGECONFIG', 'gumjs', 'true', 'false', d)}; then
+        test -f "${D}${libdir}/frida/lib/libfrida-gumjs-1.0.a" || \
+            bbfatal "Missing static Frida GumJS library"
+
+        test -f "${D}${libdir}/frida/lib/pkgconfig/frida-gumjs-1.0.pc" || \
+            bbfatal "Missing Frida GumJS pkg-config metadata"
+    fi
 }
