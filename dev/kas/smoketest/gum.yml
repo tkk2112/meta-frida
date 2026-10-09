@@ -1,0 +1,7 @@
+header:
+  version: 19
+
+local_conf_header:
+  gum-smoketest: |
+    IMAGE_INSTALL:append = " frida-gum-smoketest"
+    TEST_SUITES:append = " frida_gum"

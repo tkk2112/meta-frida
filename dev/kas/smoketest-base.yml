@@ -1,0 +1,21 @@
+header:
+  version: 19
+  includes:
+    - dev/kas/base.yml
+
+target: core-image-minimal
+
+local_conf_header:
+  testbase: |
+    IMAGE_CLASSES += "testimage"
+    IMAGE_FSTYPES = "ext4"
+    TESTIMAGE_AUTO = "1"
+    TEST_SUITES = "ping ssh"
+
+    ZSTD_THREADS = "8"
+
+    PACKAGECONFIG:remove:pn-dropbear = "x11"
+    EXTRA_IMAGE_FEATURES:append = " ssh-server-dropbear allow-empty-password empty-root-password allow-root-login"
+
+    TEST_RUNQEMUPARAMS = "slirp"
+    QEMU_USE_KVM = "0"
