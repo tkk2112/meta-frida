@@ -3,20 +3,19 @@
 set -euo pipefail
 
 SCRIPT_DIR="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd)"
-
 ROOT="$(cd -- "$SCRIPT_DIR/../.." && pwd)"
 
 usage() {
     cat <<EOF
 Usage: smoketest <name>
+       smoketest --all
 
 Available smoke tests:
 EOF
 
     for config in "$ROOT"/dev/kas/smoketest/*.yml; do
         [[ -f "$config" ]] || continue
-        name="$(basename "$config" .yml)"
-        printf '  %s\n' "$name"
+        printf '  %s\n' "$(basename "$config" .yml)"
     done
 }
 
@@ -25,28 +24,47 @@ if [[ $# -ne 1 ]]; then
     exit 2
 fi
 
+kas_config="dev/kas/smoketest-base.yml"
+
 case "$1" in
     -h|--help)
         usage
         exit 0
         ;;
+
+    --all)
+        found=false
+
+        for config in "$ROOT"/dev/kas/smoketest/*.yml; do
+            [[ -f "$config" ]] || continue
+            kas_config+=":dev/kas/smoketest/$(basename "$config")"
+            found=true
+        done
+
+        if [[ "$found" == false ]]; then
+            echo "error: no smoke tests found" >&2
+            exit 2
+        fi
+        ;;
+
+    *)
+        name="$1"
+
+        if [[ ! "$name" =~ ^[a-z][a-z0-9_-]*$ ]]; then
+            echo "error: invalid smoke test name: $name" >&2
+            exit 2
+        fi
+
+        config="dev/kas/smoketest/$name.yml"
+
+        if [[ ! -f "$ROOT/$config" ]]; then
+            echo "error: unknown smoke test: $name" >&2
+            usage >&2
+            exit 2
+        fi
+
+        kas_config+=":$config"
+        ;;
 esac
-
-name="$1"
-
-if [[ ! "$name" =~ ^[a-z][a-z0-9_-]*$ ]]; then
-    echo "error: invalid smoke test name: $name" >&2
-    exit 2
-fi
-
-config="dev/kas/smoketest/$name.yml"
-
-if [[ ! -f "$ROOT/$config" ]]; then
-    echo "error: unknown smoke test: $name" >&2
-    usage >&2
-    exit 2
-fi
-
-kas_config="dev/kas/smoketest-base.yml:$config"
 
 exec "$SCRIPT_DIR/yocto" build "$kas_config"
