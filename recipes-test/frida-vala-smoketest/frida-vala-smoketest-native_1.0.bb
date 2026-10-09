@@ -31,9 +31,20 @@ vala_args = ['--vapidir=${STAGING_LIBDIR_NATIVE}/frida-vala/share/vala-0.58/vapi
 EOF
 }
 
-do_compile:append() {
-    "${B}/frida-vala-smoketest" | grep -F "frida vala smoke test"
+do_smoketest() {
+    output="$("${B}/frida-vala-smoketest")" || \
+        bbfatal "Frida Vala smoke test executable failed"
+
+    if [ "$output" != "frida vala smoke test" ]; then
+        bbfatal "Unexpected Vala smoke test output: $output"
+    fi
+
+    bbplain "PASS: $output"
 }
+
+do_smoketest[nostamp] = "1"
+
+addtask smoketest after do_compile
 
 do_install() {
     :

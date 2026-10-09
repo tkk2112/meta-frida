@@ -26,7 +26,7 @@ OELINT_FORMAT := $(OELINT_FORMAT_CHECK) \
 OELINT_FILES := $(shell find recipes-frida recipes-devtools classes-recipe conf \
 	-type f \( -name '*.bb' -o -name '*.bbappend' -o -name '*.bbclass' -o -name '*.inc' \))
 
-.PHONY: format check-format lint sync
+.PHONY: format check-format lint sync test
 
 format:
 	$(OELINT_FORMAT) $(OELINT_FILES)
@@ -43,3 +43,8 @@ lint:
 
 sync:
 	$(UV_SYNC) --upgrade
+
+test:
+	@$(SCRIPTS_DIR)/bitbake -q -c smoketest frida-vala-smoketest-native
+	@printf 'RESULTS - Frida Vala smoke test: PASSED\n'
+	@$(SCRIPTS_DIR)/smoketest --all
