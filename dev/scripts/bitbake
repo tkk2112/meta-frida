@@ -1,0 +1,14 @@
+#!/usr/bin/env bash
+
+set -euo pipefail
+
+SCRIPT_DIR="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd)"
+
+cmd="bitbake"
+
+for arg in "$@"; do
+    escaped=${arg//\'/\'\\\'\'}
+    cmd+=" '$escaped'"
+done
+
+exec "$SCRIPT_DIR/yocto" shell dev/kas/base.yml -c "$cmd"
