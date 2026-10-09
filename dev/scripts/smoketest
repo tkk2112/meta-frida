@@ -1,0 +1,52 @@
+#!/usr/bin/env bash
+
+set -euo pipefail
+
+SCRIPT_DIR="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd)"
+
+ROOT="$(cd -- "$SCRIPT_DIR/../.." && pwd)"
+
+usage() {
+    cat <<EOF
+Usage: smoketest <name>
+
+Available smoke tests:
+EOF
+
+    for config in "$ROOT"/dev/kas/smoketest/*.yml; do
+        [[ -f "$config" ]] || continue
+        name="$(basename "$config" .yml)"
+        printf '  %s\n' "$name"
+    done
+}
+
+if [[ $# -ne 1 ]]; then
+    usage >&2
+    exit 2
+fi
+
+case "$1" in
+    -h|--help)
+        usage
+        exit 0
+        ;;
+esac
+
+name="$1"
+
+if [[ ! "$name" =~ ^[a-z][a-z0-9_-]*$ ]]; then
+    echo "error: invalid smoke test name: $name" >&2
+    exit 2
+fi
+
+config="dev/kas/smoketest/$name.yml"
+
+if [[ ! -f "$ROOT/$config" ]]; then
+    echo "error: unknown smoke test: $name" >&2
+    usage >&2
+    exit 2
+fi
+
+kas_config="dev/kas/smoketest-base.yml:$config"
+
+exec "$SCRIPT_DIR/yocto" build "$kas_config"
