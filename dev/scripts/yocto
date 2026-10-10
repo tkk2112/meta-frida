@@ -13,6 +13,15 @@ source "$SCRIPT_DIR/lib/bootstrap.sh"
 root="$ROOT"
 image="$YOCTO_IMAGE"
 work_volume="$YOCTO_WORK_VOLUME"
+frida_version="$(
+    sed -n 's/^FRIDA_VERSION = "\([^"]*\)"$/\1/p' \
+        "$root/conf/include/frida_lock.inc"
+)"
+
+if [[ ! "$frida_version" =~ ^[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
+    echo "error: invalid FRIDA_VERSION in conf/include/frida_lock.inc" >&2
+    exit 1
+fi
 
 if [[ -n "${CONTAINER_ENGINE:-}" ]]; then
     engine="$CONTAINER_ENGINE"
@@ -33,6 +42,7 @@ fi
 
 "$engine" build \
     --build-arg "KAS_VERSION=$KAS_VERSION" \
+    --build-arg "FRIDA_VERSION=$frida_version" \
     -t "$image" \
     -f "$root/dev/containers/yocto/Dockerfile" \
     "$root"
