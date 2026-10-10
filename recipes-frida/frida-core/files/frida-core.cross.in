@@ -1,0 +1,8 @@
+[binaries]
+vala = '@FRIDA_VALAC@'
+
+[built-in options]
+vala_args = ['--vapidir=@FRIDA_TARGET_VAPIDIR@']
+
+[host_machine]
+subsystem = 'linux'
