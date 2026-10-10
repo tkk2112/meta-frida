@@ -14,6 +14,8 @@ FRIDA_PYTHON = "/opt/frida-python/bin/python"
 FRIDA_ADDRESS = "127.0.0.1:27042"
 
 AGENT = """
+const INJECT_FAULT = __INJECT_FAULT__;
+
 if (Process.arch !== "arm64")
     throw new Error("Unexpected architecture: " + Process.arch);
 
@@ -33,10 +35,16 @@ Interceptor.attach(address, {
         this.b = args[1].toInt32();
     },
     onLeave(retval) {
+        const original = retval.toInt32();
+
+        if (INJECT_FAULT)
+            retval.replace(-1);
+
         send({
             kind: "call",
             a: this.a,
             b: this.b,
+            original: original,
             result: retval.toInt32()
         });
     }
@@ -50,7 +58,7 @@ send({
 """
 
 
-def run_client(pid: int) -> None:
+def run_client(pid: int, inject_fault: bool = False) -> None:
     import frida
 
     deadline = time.monotonic() + 20
@@ -109,17 +117,24 @@ def run_client(pid: int) -> None:
             ready.set()
 
         elif payload.get("kind") == "call":
+            expected = -1 if inject_fault else 18
+
             if (
                 payload.get("a") != 7
                 or payload.get("b") != 11
-                or payload.get("result") != 18
+                or payload.get("original") != 18
+                or payload.get("result") != expected
             ):
                 errors.append(f"Unexpected call: {payload}")
 
             intercepted.set()
 
     try:
-        script = session.create_script(AGENT)
+        agent = AGENT.replace(
+            "__INJECT_FAULT__",
+            "true" if inject_fault else "false",
+        )
+        script = session.create_script(agent)
         script.on("message", on_message)
         script.load()
 
@@ -138,15 +153,26 @@ def run_client(pid: int) -> None:
         if errors:
             raise RuntimeError("; ".join(errors))
 
-        print(
-            "PASS: intercepted frida_smoke_add(7, 11) = 18",
-            flush=True,
-        )
+        if inject_fault:
+            print(
+                "PASS: replaced frida_smoke_add(7, 11) return value 18 -> -1",
+                flush=True,
+            )
+        else:
+            print(
+                "PASS: intercepted frida_smoke_add(7, 11) = 18",
+                flush=True,
+            )
 
     finally:
-        session.detach()
+        try:
+            session.detach()
+        except frida.InvalidOperationError:
+            if not inject_fault:
+                raise
 
-    print("PASS: detached", flush=True)
+    if not inject_fault:
+        print("PASS: detached", flush=True)
 
 
 if __name__ != "__main__":
@@ -214,10 +240,115 @@ if __name__ != "__main__":
             finally:
                 self.target.run(f"kill {pid} 2>/dev/null || true")
 
+        @OETestDepends(["ssh.SSHTest.test_ssh"])
+        def test_return_value_override(self):
+            pid_file = "/tmp/frida-smoke-fault.pid"
+            exit_file = "/tmp/frida-smoke-fault.exit"
+
+            self.target.run(f"rm -f {pid_file} {exit_file}")
+
+            # The wrapper waits for the child and records its actual
+            # exit status, even though the OEQA SSH command returns.
+            command = (
+                "( "
+                "frida-smoke </dev/null >/tmp/frida-smoke-fault.log 2>&1 & "
+                "child=$!; "
+                f'echo "$child" >{pid_file}; '
+                'wait "$child"; '
+                f'echo "$?" >{exit_file}; '
+                ") </dev/null >/dev/null 2>&1 &"
+            )
+
+            status, output = self.target.run(command, timeout=15)
+
+            self.assertEqual(
+                status,
+                0,
+                f"Failed to start fault-injection target:\n{output}",
+            )
+
+            pid = None
+
+            try:
+                for _ in range(50):
+                    status, output = self.target.run(f"cat {pid_file} 2>/dev/null")
+
+                    if status == 0 and output.strip().isdigit():
+                        pid = int(output.strip())
+                        break
+
+                    time.sleep(0.1)
+
+                self.assertIsNotNone(
+                    pid,
+                    "Fault-injection target did not start",
+                )
+
+                result = subprocess.run(
+                    [FRIDA_PYTHON, __file__, str(pid), "inject"],
+                    capture_output=True,
+                    text=True,
+                    timeout=60,
+                    check=False,
+                )
+
+                self.logger.info(result.stdout)
+
+                if result.stderr:
+                    self.logger.info(result.stderr)
+
+                self.assertEqual(
+                    result.returncode,
+                    0,
+                    (
+                        "Frida fault injection failed:\n"
+                        f"{result.stdout}\n{result.stderr}"
+                    ),
+                )
+
+                exit_status = None
+
+                for _ in range(50):
+                    status, output = self.target.run(f"cat {exit_file} 2>/dev/null")
+
+                    if status == 0 and output.strip().isdigit():
+                        exit_status = int(output.strip())
+                        break
+
+                    time.sleep(0.1)
+
+                self.assertEqual(
+                    exit_status,
+                    1,
+                    (
+                        "Expected target to exit with status 1 "
+                        f"after fault injection, got {exit_status}"
+                    ),
+                )
+
+                self.logger.info(
+                    "PASS: target exited with status 1 after injected return value"
+                )
+
+            finally:
+                if pid is not None:
+                    self.target.run(f"kill {pid} 2>/dev/null || true")
+
+                self.target.run(f"rm -f {pid_file} {exit_file}")
+
 
 if __name__ == "__main__":
     try:
-        run_client(int(sys.argv[1]))
+        if len(sys.argv) not in (2, 3):
+            raise ValueError("Usage: frida_core.py PID [inject]")
+
+        inject_fault = len(sys.argv) == 3 and sys.argv[2] == "inject"
+
+        if len(sys.argv) == 3 and not inject_fault:
+            raise ValueError(f"Unknown test mode: {sys.argv[2]}")
+
+        run_client(int(sys.argv[1]), inject_fault=inject_fault)
+
     except Exception as exc:  # noqa: BLE001
         print(f"FAIL: {exc}", file=sys.stderr, flush=True)
         sys.exit(1)
