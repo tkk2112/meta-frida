@@ -12,6 +12,11 @@ DEPENDS = "\
     frida-vala-native \
 "
 
+DEPENDS:class-native = "\
+    frida-vala-native \
+    glib-2.0-native \
+"
+
 PV = "0.20.6+git"
 
 SRC_URI:append = " \
@@ -27,8 +32,8 @@ EXTRA_OEMESON:append = "\
     --native-file=${B}/frida-vala.ini \
 "
 do_configure:prepend() {
-    install -m 0755 "${WORKDIR}/frida-valac" "${B}/frida-valac"
-    install -m 0644 "${WORKDIR}/frida-vala.ini" "${B}/frida-vala.ini"
+    install -m 0755 "${UNPACKDIR}/frida-valac" "${B}/frida-valac"
+    install -m 0644 "${UNPACKDIR}/frida-vala.ini" "${B}/frida-vala.ini"
 
     sed -i \
         -e "s|@VALAC@|${STAGING_LIBDIR_NATIVE}/frida-vala/bin/valac|g" \
@@ -39,19 +44,21 @@ do_configure:prepend() {
         -e "s|@FRIDA_VALAC@|${B}/frida-valac|g" \
         "${B}/frida-vala.ini"
 
+    "${STAGING_LIBDIR_NATIVE}/frida-vala/bin/valac" --version | \
+        grep -q -- '-frida' || \
+        bbfatal "Frida Vala compiler is not being used"
+}
+
+do_configure:prepend:class-target() {
     for dependency in glib-2.0 gobject-2.0 gio-2.0; do
         resolved="$(
             PKG_CONFIG_PATH="${STAGING_LIBDIR}/frida/lib/pkgconfig" \
-            pkg-config --variable=prefix "$dependency"
+                pkg-config --variable=prefix "$dependency"
         )"
 
         test "$resolved" = "${FRIDA_DEPS_PREFIX}" || \
             bbfatal "$dependency resolved to unexpected prefix: $resolved"
     done
-
-    "${STAGING_LIBDIR_NATIVE}/frida-vala/bin/valac" --version | \
-        grep -q -- '-frida' || \
-        bbfatal "Frida Vala compiler is not being used"
 }
 
 FILES:${PN}-dev += "\
@@ -63,6 +70,8 @@ FILES:${PN}-dev += "\
 FILES:${PN}-staticdev += "\
     ${FRIDA_DEPS_PREFIX}/lib/*.a \
 "
+
+BBCLASSEXTEND = "native"
 
 do_install:append() {
     test -f "${D}${FRIDA_DEPS_PREFIX}/lib/libgee-0.8.a" || \
