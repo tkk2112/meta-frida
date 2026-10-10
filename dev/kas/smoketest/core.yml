@@ -1,0 +1,9 @@
+header:
+  version: 19
+
+local_conf_header:
+  frida-core-smoketest: |
+    IMAGE_INSTALL:append = " frida-server frida-smoke-target"
+    TEST_SUITES:append = " frida_core"
+
+    QB_SLIRP_OPT = "-netdev user,id=net0,hostfwd=tcp:127.0.0.1:2222-:22,hostfwd=tcp:127.0.0.1:27042-:27042"

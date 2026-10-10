@@ -9,9 +9,13 @@ UV_SYNC := uv sync \
 	--project $(UV_PROJECT) \
 	--python $(PYTHON_VERSION)
 
-PYTHON_SCRIPTS := \
+PYTHON_SCRIPTS_HOST := \
 	dev/scripts/update_frida.py \
 	dev/scripts/tests/test_releng_meson.py
+
+PYTHON_SCRIPTS := \
+	$(PYTHON_SCRIPTS_HOST) \
+	lib/oeqa/runtime/cases/*.py
 
 OELINT := $(UV_RUN) oelint-adv --quiet --release $(OELINT_RELEASE) --hide info --constantmod=+dev/config/oelint.constants.json
 
@@ -39,7 +43,7 @@ check-format:
 lint:
 	$(OELINT) $(OELINT_FILES)
 	$(UV_RUN) ruff check $(PYTHON_SCRIPTS)
-	$(UV_RUN) ty check $(PYTHON_SCRIPTS)
+	$(UV_RUN) ty check $(PYTHON_SCRIPTS_HOST)
 
 sync:
 	$(UV_SYNC) --upgrade
