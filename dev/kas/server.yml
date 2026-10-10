@@ -1,0 +1,11 @@
+header:
+  version: 19
+  includes:
+    - dev/kas/base.yml
+
+target: core-image-minimal
+
+local_conf_header:
+  frida-server: |
+    IMAGE_INSTALL:append = " frida-server strace gdb frida-core-dbg"
+    EXTRA_IMAGE_FEATURES:append = " empty-root-password allow-empty-password allow-root-login"

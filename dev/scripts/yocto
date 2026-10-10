@@ -99,6 +99,10 @@ fi
         rm /work/.meta-frida-write-test
     '
 
+if [[ "${1:-}" == "shell" && -t 0 && -t 1 ]]; then
+    runtime_args+=(-it)
+fi
+
 exec "$engine" run \
     --rm \
     --init \
