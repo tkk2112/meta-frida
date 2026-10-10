@@ -29,6 +29,8 @@ repos:
     path: /repo
 
 local_conf_header:
+  frida-core: |
+    PACKAGECONFIG:append:pn-frida-gum = " gumjs inspector"
   meta-frida: |
     DL_DIR = "${TOPDIR}/../downloads"
     SSTATE_DIR = "${TOPDIR}/../sstate-cache"

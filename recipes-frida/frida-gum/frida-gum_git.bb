@@ -16,6 +16,7 @@ DEPENDS = "\
     frida-libunwind \
     frida-tinycc \
     glib-2.0-native \
+    gobject-introspection \
     python3-native \
 "
 
@@ -25,11 +26,8 @@ SRC_URI:append = " file://frida-linux.cross"
 
 PACKAGECONFIG ??= ""
 
-PACKAGECONFIG[gumjs] = "\
-  -Dgumjs=enabled -Dquickjs=enabled, \
-    -Dgumjs=disabled -Dquickjs=disabled, \
-    frida-quickjs frida-quickjs-native \
-"
+PACKAGECONFIG[gumjs] = "-Dgumjs=enabled -Dquickjs=enabled, -Dgumjs=disabled -Dquickjs=disabled, frida-quickjs frida-quickjs-native"
+PACKAGECONFIG[inspector] = "-Dinspector=enabled, -Dinspector=disabled, frida-libsoup"
 
 inherit frida_meson python3native
 
@@ -43,7 +41,6 @@ export EXTRA_NATIVE_PKGCONFIG_PATH = ":${STAGING_LIBDIR_NATIVE}/frida/lib/pkgcon
 EXTRA_OEMESON:append = "\
     -Dfrida_version=${FRIDA_VERSION} \
     -Dgumpp=disabled \
-    -Dinspector=disabled \
     -Dgraft_tool=disabled \
     -Dtests=disabled \
 "
