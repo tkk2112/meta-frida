@@ -4,6 +4,8 @@ import subprocess
 import sys
 import threading
 import time
+import traceback
+from contextlib import contextmanager
 
 if __name__ != "__main__":
     from oeqa.core.decorator.depends import OETestDepends
@@ -55,6 +57,47 @@ send({
     arch: Process.arch,
     modules: modules.length
 });
+"""
+
+AGENT_IO = """
+const openAddress = Module.getGlobalExportByName("open");
+const closeAddress = Module.getGlobalExportByName("close");
+const close = new NativeFunction(closeAddress, "int", ["int"]);
+
+let injected = false;
+
+Interceptor.attach(openAddress, {
+    onEnter(args) {
+        this.inject = !injected &&
+            args[0].readUtf8String() === "/etc/passwd";
+    },
+
+    onLeave(retval) {
+        if (!this.inject)
+            return;
+
+        injected = true;
+
+        const original = retval.toInt32();
+
+        // The real open() already succeeded. Close its descriptor
+        // before reporting a synthetic failure to the application.
+        if (original >= 0)
+            close(original);
+
+        retval.replace(-1);
+        this.errno = 13;  // EACCES on Linux
+
+        send({
+            kind: "io-fault",
+            original: original,
+            result: retval.toInt32(),
+            errno: this.errno
+        });
+    }
+});
+
+send({ kind: "ready" });
 """
 
 
@@ -175,11 +218,88 @@ def run_client(pid: int, inject_fault: bool = False) -> None:
         print("PASS: detached", flush=True)
 
 
+def run_io_client(pid: int) -> None:
+    import frida
+
+    device = frida.get_device_manager().add_remote_device(FRIDA_ADDRESS)
+    processes = device.enumerate_processes()
+
+    if not any(process.pid == pid for process in processes):
+        raise RuntimeError(f"Target PID {pid} not found")
+
+    session = device.attach(pid)
+    ready = threading.Event()
+    injected = threading.Event()
+    errors: list[str] = []
+
+    def on_message(message, _data):
+        if message["type"] == "error":
+            errors.append(message.get("stack", str(message)))
+            ready.set()
+            injected.set()
+            return
+
+        if message["type"] != "send":
+            return
+
+        payload = message["payload"]
+
+        if payload.get("kind") == "ready":
+            ready.set()
+
+        elif payload.get("kind") == "io-fault":
+            if (
+                payload.get("original", -1) < 0
+                or payload.get("result") != -1
+                or payload.get("errno") != 13
+            ):
+                errors.append(f"Unexpected I/O result: {payload}")
+
+            injected.set()
+
+    script = session.create_script(AGENT_IO)
+    script.on("message", on_message)
+
+    try:
+        script.load()
+
+        if not ready.wait(10):
+            raise TimeoutError("I/O agent initialization timed out")
+
+        if errors:
+            raise RuntimeError("; ".join(errors))
+
+        if not injected.wait(10):
+            raise TimeoutError("No matching open() call intercepted")
+
+        if errors:
+            raise RuntimeError("; ".join(errors))
+
+        print("PASS: intercepted open('/etc/passwd')", flush=True)
+        print("PASS: replaced successful open() with -1/EACCES", flush=True)
+
+    finally:
+        try:
+            session.detach()
+        except frida.InvalidOperationError:
+            # The process may have exited after receiving EACCES.
+            pass
+
+
 if __name__ != "__main__":
 
     class FridaCoreTest(OERuntimeTestCase):
-        @OETestDepends(["ssh.SSHTest.test_ssh"])
-        def test_remote_interception(self):
+        def setUp(self):
+            super().setUp()
+
+            status, output = self.target.run(
+                "pidof frida-server",
+                timeout=10,
+            )
+
+            if status == 0 and output.strip():
+                return
+
             status, output = self.target.run(
                 "frida-server -D -l 0.0.0.0:27042",
                 timeout=30,
@@ -191,41 +311,95 @@ if __name__ != "__main__":
                 f"Failed to start frida-server:\n{output}",
             )
 
+        def _read_target_file(self, path):
             status, output = self.target.run(
-                "frida-smoke </dev/null >/tmp/frida-smoke.log 2>&1 & echo $!",
-                timeout=15,
+                f"cat {path} 2>/dev/null",
+                timeout=10,
+            )
+            return output.strip() if status == 0 else None
+
+        def _wait_for_integer(self, path):
+            for _ in range(50):
+                value = self._read_target_file(path)
+
+                if value is not None and value.isdigit():
+                    return int(value)
+
+                time.sleep(0.1)
+
+            self.fail(f"Timed out waiting for integer in {path}")
+
+        @contextmanager
+        def _target_process(self, name, args=""):
+            prefix = f"/tmp/frida-smoke-{name}"
+            pid_file = f"{prefix}.pid"
+            exit_file = f"{prefix}.exit"
+            log_file = f"{prefix}.log"
+
+            self.target.run(f"rm -f {pid_file} {exit_file}")
+
+            # The shell waits for its child and records the exit code.
+            # This is needed when Frida deliberately terminates the target.
+            command = (
+                "( "
+                f"frida-smoke {args} </dev/null >{log_file} 2>&1 & "
+                "child=$!; "
+                f'echo "$child" >{pid_file}; '
+                'wait "$child"; '
+                f'echo "$?" >{exit_file}; '
+                ") </dev/null >/dev/null 2>&1 &"
             )
 
-            self.assertEqual(
-                status,
-                0,
-                f"Failed to start smoke target:\n{output}",
-            )
-
-            pid = int(output.strip().splitlines()[-1])
+            pid = None
 
             try:
-                result = subprocess.run(
-                    [FRIDA_PYTHON, __file__, str(pid)],
-                    capture_output=True,
-                    text=True,
-                    timeout=60,
-                    check=False,
-                )
-
-                self.logger.info(result.stdout)
-
-                if result.stderr:
-                    self.logger.info(result.stderr)
+                status, output = self.target.run(command, timeout=15)
 
                 self.assertEqual(
-                    result.returncode,
+                    status,
                     0,
-                    (
-                        "Frida Core smoke test failed:\n"
-                        f"{result.stdout}\n{result.stderr}"
-                    ),
+                    f"Failed to start frida-smoke:\n{output}",
                 )
+
+                pid = self._wait_for_integer(pid_file)
+                yield pid, exit_file
+
+            finally:
+                if pid is not None:
+                    self.target.run(f"kill {pid} 2>/dev/null || true")
+
+                self.target.run(f"rm -f {pid_file} {exit_file}")
+
+        def _run_client(self, pid, mode=None):
+            command = [FRIDA_PYTHON, __file__, str(pid)]
+
+            if mode is not None:
+                command.append(mode)
+
+            result = subprocess.run(
+                command,
+                capture_output=True,
+                text=True,
+                timeout=60,
+                check=False,
+            )
+
+            if result.stdout:
+                self.logger.info(result.stdout)
+
+            if result.stderr:
+                self.logger.info(result.stderr)
+
+            self.assertEqual(
+                result.returncode,
+                0,
+                f"Frida client failed:\n{result.stdout}\n{result.stderr}",
+            )
+
+        @OETestDepends(["ssh.SSHTest.test_ssh"])
+        def test_remote_interception(self):
+            with self._target_process("observe") as (pid, _):
+                self._run_client(pid)
 
                 status, output = self.target.run(f"kill -0 {pid}")
 
@@ -237,85 +411,12 @@ if __name__ != "__main__":
 
                 self.logger.info("PASS: target survived detachment")
 
-            finally:
-                self.target.run(f"kill {pid} 2>/dev/null || true")
-
         @OETestDepends(["ssh.SSHTest.test_ssh"])
         def test_return_value_override(self):
-            pid_file = "/tmp/frida-smoke-fault.pid"
-            exit_file = "/tmp/frida-smoke-fault.exit"
+            with self._target_process("fault") as (pid, exit_file):
+                self._run_client(pid, "inject")
 
-            self.target.run(f"rm -f {pid_file} {exit_file}")
-
-            # The wrapper waits for the child and records its actual
-            # exit status, even though the OEQA SSH command returns.
-            command = (
-                "( "
-                "frida-smoke </dev/null >/tmp/frida-smoke-fault.log 2>&1 & "
-                "child=$!; "
-                f'echo "$child" >{pid_file}; '
-                'wait "$child"; '
-                f'echo "$?" >{exit_file}; '
-                ") </dev/null >/dev/null 2>&1 &"
-            )
-
-            status, output = self.target.run(command, timeout=15)
-
-            self.assertEqual(
-                status,
-                0,
-                f"Failed to start fault-injection target:\n{output}",
-            )
-
-            pid = None
-
-            try:
-                for _ in range(50):
-                    status, output = self.target.run(f"cat {pid_file} 2>/dev/null")
-
-                    if status == 0 and output.strip().isdigit():
-                        pid = int(output.strip())
-                        break
-
-                    time.sleep(0.1)
-
-                self.assertIsNotNone(
-                    pid,
-                    "Fault-injection target did not start",
-                )
-
-                result = subprocess.run(
-                    [FRIDA_PYTHON, __file__, str(pid), "inject"],
-                    capture_output=True,
-                    text=True,
-                    timeout=60,
-                    check=False,
-                )
-
-                self.logger.info(result.stdout)
-
-                if result.stderr:
-                    self.logger.info(result.stderr)
-
-                self.assertEqual(
-                    result.returncode,
-                    0,
-                    (
-                        "Frida fault injection failed:\n"
-                        f"{result.stdout}\n{result.stderr}"
-                    ),
-                )
-
-                exit_status = None
-
-                for _ in range(50):
-                    status, output = self.target.run(f"cat {exit_file} 2>/dev/null")
-
-                    if status == 0 and output.strip().isdigit():
-                        exit_status = int(output.strip())
-                        break
-
-                    time.sleep(0.1)
+                exit_status = self._wait_for_integer(exit_file)
 
                 self.assertEqual(
                     exit_status,
@@ -330,25 +431,38 @@ if __name__ != "__main__":
                     "PASS: target exited with status 1 after injected return value"
                 )
 
-            finally:
-                if pid is not None:
-                    self.target.run(f"kill {pid} 2>/dev/null || true")
+        @OETestDepends(["ssh.SSHTest.test_ssh"])
+        def test_open_eacces_injection(self):
+            with self._target_process("io", "io") as (pid, exit_file):
+                self._run_client(pid, "io")
 
-                self.target.run(f"rm -f {pid_file} {exit_file}")
+                exit_status = self._wait_for_integer(exit_file)
+
+                self.assertEqual(
+                    exit_status,
+                    42,
+                    f"Expected EACCES handling (exit 42), got {exit_status}",
+                )
+
+                self.logger.info("PASS: application handled injected EACCES (exit 42)")
 
 
 if __name__ == "__main__":
     try:
-        if len(sys.argv) not in (2, 3):
-            raise ValueError("Usage: frida_core.py PID [inject]")
+        if len(sys.argv) < 2 or len(sys.argv) > 3:
+            raise ValueError("Usage: frida_core.py PID [inject|io]")
 
-        inject_fault = len(sys.argv) == 3 and sys.argv[2] == "inject"
+        pid = int(sys.argv[1])
+        mode = sys.argv[2] if len(sys.argv) == 3 else "observe"
 
-        if len(sys.argv) == 3 and not inject_fault:
-            raise ValueError(f"Unknown test mode: {sys.argv[2]}")
-
-        run_client(int(sys.argv[1]), inject_fault=inject_fault)
+        if mode == "io":
+            run_io_client(pid)
+        elif mode in ("observe", "inject"):
+            run_client(pid, inject_fault=(mode == "inject"))
+        else:
+            raise ValueError(f"Unknown mode: {mode}")
 
     except Exception as exc:  # noqa: BLE001
         print(f"FAIL: {exc}", file=sys.stderr, flush=True)
+        traceback.print_exc()
         sys.exit(1)
