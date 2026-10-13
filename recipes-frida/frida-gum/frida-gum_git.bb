@@ -20,11 +20,15 @@ DEPENDS = "\
     python3-native \
 "
 
+# GIR generation is not used for the cross-built SDK-host Gum libraries.
+DEPENDS:remove:class-nativesdk = "gobject-introspection"
+
 PV = "${FRIDA_VERSION}+git"
 
 SRC_URI:append = " file://frida-linux.cross"
 
 PACKAGECONFIG ??= ""
+PACKAGECONFIG:append:class-nativesdk = " gumjs inspector"
 
 PACKAGECONFIG[gumjs] = "-Dgumjs=enabled -Dquickjs=enabled, -Dgumjs=disabled -Dquickjs=disabled, frida-quickjs frida-quickjs-native"
 PACKAGECONFIG[inspector] = "-Dinspector=enabled, -Dinspector=disabled, frida-libsoup"
@@ -44,6 +48,7 @@ EXTRA_OEMESON:append = "\
     -Dgraft_tool=disabled \
     -Dtests=disabled \
 "
+EXTRA_OEMESON:append:class-nativesdk = " --cross-file=${UNPACKDIR}/frida-linux.cross"
 
 FILES:${PN}-dev += "\
     ${FRIDA_DEPS_PREFIX}/include \
