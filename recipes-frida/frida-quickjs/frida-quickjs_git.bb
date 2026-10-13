@@ -20,8 +20,6 @@ FILES:${PN}-staticdev += "\
     ${FRIDA_DEPS_PREFIX}/lib/*.a \
 "
 
-BBCLASSEXTEND = "native"
-
 do_install:append() {
     test -f "${D}${FRIDA_DEPS_PREFIX}/lib/libquickjs.a" || \
         bbfatal "Missing private QuickJS static library"

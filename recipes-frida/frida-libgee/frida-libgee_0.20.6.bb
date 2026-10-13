@@ -71,8 +71,6 @@ FILES:${PN}-staticdev += "\
     ${FRIDA_DEPS_PREFIX}/lib/*.a \
 "
 
-BBCLASSEXTEND = "native"
-
 do_install:append() {
     test -f "${D}${FRIDA_DEPS_PREFIX}/lib/libgee-0.8.a" || \
         bbfatal "Private static libgee was not installed"

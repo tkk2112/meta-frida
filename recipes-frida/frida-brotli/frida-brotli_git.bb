@@ -20,8 +20,6 @@ FILES:${PN}-staticdev += "\
     ${FRIDA_DEPS_PREFIX}/lib/*.a \
 "
 
-BBCLASSEXTEND = "native"
-
 do_install:append() {
     for lib in brotlicommon brotlidec brotlienc; do
         test -f "${D}${FRIDA_DEPS_PREFIX}/lib/lib${lib}.a" || \

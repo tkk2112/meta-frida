@@ -18,6 +18,9 @@ PV = "0.58.0+git"
 inherit frida_dep_meson vala
 inherit_defer native
 
+# This recipe is already native-only.
+BBCLASSEXTEND:remove = "native nativesdk"
+
 FRIDA_DEPS_PREFIX = "${libdir}/frida-vala"
 
 EXTRA_OEMESON:append = " \
