@@ -1,0 +1,2 @@
+[binaries]
+g-ir-compiler = './frida-g-ir-compiler-disabled'

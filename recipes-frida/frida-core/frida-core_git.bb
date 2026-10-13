@@ -29,13 +29,23 @@ PV = "${FRIDA_VERSION}+git"
 
 FRIDA_COMPONENT = "frida-core"
 
-inherit frida_source meson pkgconfig
+inherit frida_meson
 
 SRC_URI += "\
     file://frida-core.cross.in \
     file://frida-core.native.in \
     file://frida-valac.in \
 "
+SRC_URI:append:class-nativesdk = " file://frida-core.nativesdk.cross"
+
+# Core installs into normal system locations, unlike private dependencies.
+FRIDA_MESON_PREFIX = "${prefix}"
+FRIDA_MESON_BINDIR = "${bindir}"
+FRIDA_MESON_LIBDIR = "${libdir}"
+FRIDA_MESON_INCLUDEDIR = "${includedir}"
+FRIDA_MESON_DATADIR = "${datadir}"
+
+FRIDA_MESON_LIBRARY = "${FRIDA_CORE_LIBRARY}"
 
 FRIDA_VALAC = "${STAGING_LIBDIR_NATIVE}/frida-vala/bin/valac"
 FRIDA_VAPIDIR = "${STAGING_LIBDIR_NATIVE}/frida-vala/share/vala-0.58/vapi"
@@ -43,6 +53,15 @@ FRIDA_TARGET_VAPIDIR = "${STAGING_LIBDIR}/frida/share/vala/vapi"
 
 PKG_CONFIG_PATH:prepend = "${STAGING_LIBDIR}/frida/lib/pkgconfig:"
 export EXTRA_NATIVE_PKGCONFIG_PATH = ":${STAGING_LIBDIR_NATIVE}/frida/lib/pkgconfig"
+
+FRIDA_CORE_SERVER = "enabled"
+FRIDA_CORE_SERVER:class-nativesdk = "disabled"
+
+FRIDA_CORE_LIBRARY = "static"
+FRIDA_CORE_LIBRARY:class-nativesdk = "shared"
+
+FRIDA_CORE_ASSETS = "embedded"
+FRIDA_CORE_ASSETS:class-nativesdk = "installed"
 
 EXTRA_OEMESON:append = "\
     --cross-file=${B}/frida-core.cross \
@@ -55,7 +74,7 @@ EXTRA_OEMESON:append = "\
     -Ddroidy_backend=disabled \
     -Dbarebone_backend=disabled \
     -Dcompiler_backend=disabled \
-    -Dserver=enabled \
+    -Dserver=${FRIDA_CORE_SERVER} \
     -Dportal=disabled \
     -Dinject=disabled \
     -Dgadget=disabled \
@@ -63,9 +82,9 @@ EXTRA_OEMESON:append = "\
     -Dconnectivity=disabled \
     -Dmapper=disabled \
     -Dcompat=disabled \
-    -Dassets=embedded \
-    -Ddefault_library=static \
+    -Dassets=${FRIDA_CORE_ASSETS} \
 "
+EXTRA_OEMESON:append:class-nativesdk = " --cross-file=${UNPACKDIR}/frida-core.nativesdk.cross"
 
 do_configure:prepend() {
     test -x "${FRIDA_VALAC}" || \
@@ -112,7 +131,7 @@ FILES:frida-server += "\
     ${bindir}/frida-server \
 "
 
-do_install:append() {
+do_install:append:class-target() {
     test -f "${D}${bindir}/frida-server" || \
         bbfatal "frida-server was not installed"
 }
@@ -125,3 +144,9 @@ FILES:${PN}-dev += "\
     ${datadir}/gir-1.0 \
     ${datadir}/vala/vapi \
 "
+
+FILES:${PN}:append:class-nativesdk = " ${libdir}/frida-1.0"
+
+# Frida Core installs an unversioned shared library, not a .so symlink.
+SOLIBS:class-nativesdk = ".so"
+FILES_SOLIBSDEV:class-nativesdk = ""
