@@ -1,4 +1,6 @@
-# Expose Frida's private static dependency metadata to SDK consumers.
-# Ordinary recipes retain Yocto's standard pkg-config search paths.
+# SPDX-License-Identifier: MIT
 
-PKG_CONFIG_PATH:prepend = "${RECIPE_SYSROOT}${libdir}/frida/lib/pkgconfig:"
+inherit pkgconfig
+
+# Expose Frida's private dependency metadata to SDK consumers.
+PKG_CONFIG_PATH:prepend = "${STAGING_LIBDIR}/frida/lib/pkgconfig:"

@@ -1,0 +1,12 @@
+header:
+  version: 19
+  includes:
+    - dev/kas/base.yml
+
+local_conf_header:
+  frida-sdk: |
+    TOOLCHAIN_HOST_TASK:append = "\
+        nativesdk-frida-core \
+        nativesdk-frida-core-dev \
+        nativesdk-frida-core-host-smoketest \
+    "

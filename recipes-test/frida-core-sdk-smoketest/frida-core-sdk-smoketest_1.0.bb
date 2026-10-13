@@ -12,4 +12,4 @@ SRC_URI = "\
 
 S = "${UNPACKDIR}"
 
-inherit meson pkgconfig frida_sdk
+inherit meson frida_sdk
