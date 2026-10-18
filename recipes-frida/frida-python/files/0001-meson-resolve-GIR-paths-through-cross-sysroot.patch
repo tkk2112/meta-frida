@@ -1,0 +1,28 @@
+Subject: [PATCH] meson: resolve GIR paths through cross sysroot
+
+External Frida Core installations expose their GIR directory
+through pkg-config. During cross-compilation, this path may refer
+to the final installation prefix rather than the build sysroot.
+
+Use Meson's sys_root property to resolve the GIR files when needed.
+
+Upstream-Status: Pending
+Signed-off-by: Thomas Kristensen <thomas@sl.m04r.space>
+---
+diff --git a/frida/meson.build b/frida/meson.build
+--- a/frida/meson.build
++++ b/frida/meson.build
+@@ -6,6 +6,13 @@ if frida_core_dep.type_name() == 'internal'
+   gio_gir = frida_core_subprj.get_variable('gio_gir')
+ else
+   girdir = frida_core_dep.get_variable('frida_girdir')
++  if meson.is_cross_build()
++    sysroot = meson.get_external_property('sys_root', '')
++    if sysroot != '' and girdir.startswith('/') and not girdir.startswith(sysroot + '/')
++      girdir = sysroot + girdir
++    endif
++  endif
++
+   frida_gir = girdir / 'Frida-1.0.gir'
+   glib_gir = girdir / 'GLib-2.0.gir'
+   gobject_gir = girdir / 'GObject-2.0.gir'
