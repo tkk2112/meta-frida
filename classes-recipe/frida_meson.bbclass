@@ -10,6 +10,7 @@ FRIDA_MESON_LIBDIR ??= "lib"
 FRIDA_MESON_INCLUDEDIR ??= "include"
 FRIDA_MESON_DATADIR ??= "share"
 FRIDA_MESON_LIBRARY ??= "static"
+FRIDA_MESON_SUBSYSTEM = "${@'macos' if (d.getVar('TARGET_OS') or '').startswith('darwin') else (d.getVar('TARGET_OS') or '').split('-')[0]}"
 
 EXTRA_OEMESON:append = " \
     --prefix=${FRIDA_MESON_PREFIX} \

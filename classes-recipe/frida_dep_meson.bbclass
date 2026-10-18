@@ -8,13 +8,17 @@ FRIDA_MESON_OPTIMIZED ??= "${@'0' if d.getVar('DEBUG_BUILD') == '1' else '1'}"
 def frida_meson_condition(expression, d):
     import ast
 
-    target_os = (d.getVar("TARGET_OS") or "").split("-")[0]
-    if target_os != "linux":
-        bb.fatal("%s: frida_dep_meson currently supports hosted Linux only" % d.getVar("PN"))
+    subsystem = d.getVar("FRIDA_MESON_SUBSYSTEM")
+    if subsystem != "linux":
+        bb.fatal(
+            "%s: unsupported Frida dependency platform: %s"
+            % (d.getVar("PN"), subsystem)
+        )
 
     arch = d.getVar("TARGET_ARCH")
+
     machine = {
-        "os": target_os,
+        "os": subsystem,
         "arch": {"aarch64": "arm64", "i586": "x86", "i686": "x86"}.get(arch, arch),
         "config": d.getVar("TCLIBC") or "glibc",
         "is_apple": False,

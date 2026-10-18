@@ -21,6 +21,7 @@
       "FRIDA_DEP",
       "FRIDA_COMPONENT",
       "FRIDA_MESON_SKIP_ARGS",
+      "FRIDA_MESON_SUBSYSTEM",
       "FRIDA_MESON_OPTIMIZED"
     ]
   }

@@ -25,7 +25,7 @@ DEPENDS:remove:class-nativesdk = "gobject-introspection"
 
 PV = "${FRIDA_VERSION}+git"
 
-SRC_URI:append = " file://frida-linux.cross"
+SRC_URI:append = " file://frida-gum.cross.in"
 
 PACKAGECONFIG ??= ""
 PACKAGECONFIG:append:class-nativesdk = " gumjs inspector"
@@ -35,7 +35,8 @@ PACKAGECONFIG[inspector] = "-Dinspector=enabled, -Dinspector=disabled, frida-lib
 
 inherit frida_meson python3native
 
-MESON_CROSS_FILE:append:class-target = " --cross-file ${UNPACKDIR}/frida-linux.cross"
+MESON_CROSS_FILE:append:class-target = " --cross-file ${B}/frida-gum.cross"
+MESON_CROSS_FILE:append:class-nativesdk = " --cross-file ${B}/frida-gum.cross"
 
 PKG_CONFIG_PATH:prepend = "${STAGING_LIBDIR}/frida/lib/pkgconfig:"
 
@@ -48,7 +49,6 @@ EXTRA_OEMESON:append = "\
     -Dgraft_tool=disabled \
     -Dtests=disabled \
 "
-EXTRA_OEMESON:append:class-nativesdk = " --cross-file=${UNPACKDIR}/frida-linux.cross"
 
 FILES:${PN}-dev += "\
     ${FRIDA_DEPS_PREFIX}/include \
@@ -59,6 +59,12 @@ FILES:${PN}-dev += "\
 FILES:${PN}-staticdev += "\
     ${FRIDA_DEPS_PREFIX}/lib/*.a \
 "
+
+do_configure:prepend() {
+    sed \
+        -e "s|@FRIDA_SUBSYSTEM@|${FRIDA_MESON_SUBSYSTEM}|g" \
+        "${UNPACKDIR}/frida-gum.cross.in" > "${B}/frida-gum.cross"
+}
 
 do_install:append() {
     test -f "${D}${FRIDA_DEPS_PREFIX}/lib/libfrida-gum-1.0.a" || \

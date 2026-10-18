@@ -5,4 +5,4 @@ vala = '@FRIDA_VALAC@'
 vala_args = ['--vapidir=@FRIDA_TARGET_VAPIDIR@']
 
 [host_machine]
-subsystem = 'linux'
+subsystem = '@FRIDA_SUBSYSTEM@'

@@ -63,8 +63,10 @@ FRIDA_CORE_LIBRARY:class-nativesdk = "shared"
 FRIDA_CORE_ASSETS = "embedded"
 FRIDA_CORE_ASSETS:class-nativesdk = "installed"
 
+MESON_CROSS_FILE:append = " --cross-file ${B}/frida-core.cross"
+MESON_CROSS_FILE:append:class-nativesdk = " --cross-file ${UNPACKDIR}/frida-core.nativesdk.cross"
+
 EXTRA_OEMESON:append = "\
-    --cross-file=${B}/frida-core.cross \
     --native-file=${B}/frida-core.native \
     -Dfrida_version=${FRIDA_VERSION} \
     -Dlocal_backend=enabled \
@@ -84,7 +86,6 @@ EXTRA_OEMESON:append = "\
     -Dcompat=disabled \
     -Dassets=${FRIDA_CORE_ASSETS} \
 "
-EXTRA_OEMESON:append:class-nativesdk = " --cross-file=${UNPACKDIR}/frida-core.nativesdk.cross"
 
 do_configure:prepend() {
     test -x "${FRIDA_VALAC}" || \
@@ -116,6 +117,7 @@ do_configure:prepend() {
         sed -i \
             -e "s|@FRIDA_VALAC@|${B}/frida-valac|g" \
             -e "s|@FRIDA_TARGET_VAPIDIR@|${FRIDA_TARGET_VAPIDIR}|g" \
+            -e "s|@FRIDA_SUBSYSTEM@|${FRIDA_MESON_SUBSYSTEM}|g" \
             "${B}/frida-core.${machine}"
     done
 
