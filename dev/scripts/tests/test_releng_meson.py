@@ -51,6 +51,7 @@ version = "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb"
                 releng_revision="d" * 40,
                 components={},
                 packages=packages,
+                dependency_versions=dict.fromkeys(MODULE["LOCK_DEP_VERSION_NAMES"], "1.2.3"),
                 meson_options=options,
                 gvdb_url="https://gitlab.gnome.org/GNOME/gvdb.git",
                 gvdb_revision="e" * 40,

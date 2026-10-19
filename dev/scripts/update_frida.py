@@ -42,6 +42,15 @@ LOCK_ASSIGNMENT_RE = re.compile(
     re.MULTILINE,
 )
 
+LOCK_DEP_VERSION_NAMES = (
+    "glib",
+    "libdwarf",
+    "json-glib",
+    "libffi",
+    "libgee",
+    "vala",
+)
+
 GIT_REVISION_RE = re.compile(r"^[0-9a-f]{40}$")
 
 TOOLS_RECIPES = ROOT / "recipes-frida/frida-tools"
@@ -504,6 +513,37 @@ def bitbake_literal(value: str) -> str:
     return f'"{value}"'
 
 
+DEPENDENCY_VERSION_RE = re.compile(r"^\d+\.\d+(?:\.\d+)*(?:-frida)?$")
+
+MESON_VERSION_RE = re.compile(r"""\bversion\s*:\s*['"](\d+\.\d+(?:\.\d+)*(?:-frida)?)['"]""")
+
+AUTOCONF_VERSION_RE = re.compile(r"""(?m)^\s*AC_INIT\s*\(\s*\[[^]]+\]\s*,\s*\[(\d+\.\d+(?:\.\d+)*)\]""")
+
+
+def dependency_version(source: Path) -> str:
+    """Read a literal upstream version from a pinned source checkout."""
+    candidates = (
+        ("meson.build", MESON_VERSION_RE),
+        ("configure.ac", AUTOCONF_VERSION_RE),
+    )
+
+    for filename, pattern in candidates:
+        path = source / filename
+
+        if not path.is_file():
+            continue
+
+        match = pattern.search(path.read_text(encoding="utf-8"))
+
+        if match:
+            version = match.group(1)
+
+            if DEPENDENCY_VERSION_RE.fullmatch(version):
+                return version
+
+    raise RuntimeError(f"Cannot determine dependency version from {source}")
+
+
 def format_lock(
     *,
     version: str,
@@ -513,6 +553,7 @@ def format_lock(
     releng_revision: str,
     components: Mapping[str, tuple[str, str]],
     packages: Mapping[str, Any],
+    dependency_versions: Mapping[str, str],
     meson_options: Mapping[str, list[tuple[str, str]]],
     gvdb_url: str,
     gvdb_revision: str,
@@ -581,6 +622,12 @@ def format_lock(
             "",
         ]
     )
+
+    for identifier in LOCK_DEP_VERSION_NAMES:
+        version = dependency_versions[identifier]
+        lines.append(f'FRIDA_DEP_VERSION[{identifier}] = "{version}"')
+
+    lines.append("")
 
     return "\n".join(lines)
 
@@ -734,6 +781,32 @@ def generate_lock(
         print("\nNested dependencies")
         print(f"  glib/gvdb            {gvdb_revision}")
 
+        print("\nResolving dependency versions")
+        versions: dict[str, str] = {}
+
+        for identifier in LOCK_DEP_VERSION_NAMES:
+            url, revision = package_source(packages, identifier)
+
+            if identifier == "glib":
+                source = glib
+            else:
+                source = clone_revision(
+                    url,
+                    revision,
+                    workdir / f"version-{identifier}",
+                    verbose=verbose,
+                )
+
+            if source.working_tree_dir is None:
+                raise RuntimeError(f"{identifier}: missing source checkout")
+
+            try:
+                versions[identifier] = dependency_version(Path(source.working_tree_dir))
+            except RuntimeError as exc:
+                raise RuntimeError(f"{identifier}@{revision}: {exc}") from exc
+
+            print(f"  {identifier:<20} {versions[identifier]}")
+
         print("\nResolving Frida Python source")
         python_metadata = frida_python_metadata(version)
         python_sha256 = frida_python_sdist_checksum(
@@ -750,6 +823,7 @@ def generate_lock(
             releng_revision=releng_revision,
             components=components,
             packages=packages,
+            dependency_versions=versions,
             meson_options=meson_options,
             gvdb_url=gvdb_url,
             gvdb_revision=gvdb_revision,

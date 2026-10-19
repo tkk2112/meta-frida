@@ -149,6 +149,7 @@ class TestFridaPythonUpdate(unittest.TestCase):
             releng_revision="b" * 40,
             components={},
             packages={},
+            dependency_versions=dict.fromkeys(updater.LOCK_DEP_VERSION_NAMES, "1.2.3"),
             meson_options={},
             gvdb_url="https://github.com/GNOME/gvdb.git",
             gvdb_revision="c" * 40,
