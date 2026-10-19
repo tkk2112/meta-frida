@@ -11,6 +11,7 @@ UV_SYNC := uv sync \
 
 PYTHON_SCRIPTS_HOST := \
 	dev/scripts/update_frida.py \
+	dev/scripts/frida_license_audit.py \
 	$(wildcard dev/scripts/tests/test_*.py)
 
 PYTHON_SCRIPTS := \
