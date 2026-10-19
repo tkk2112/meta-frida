@@ -5,6 +5,7 @@ from __future__ import annotations
 import argparse
 import hashlib
 import os
+import posixpath
 import re
 import subprocess
 import tempfile
@@ -127,25 +128,41 @@ def git_blob(
     revision: str,
     path: str,
 ) -> bytes | None:
-    if path.startswith("/") or ".." in Path(path).parts:
-        raise ValueError(f"Invalid license path: {path}")
+    seen: set[str] = set()
 
-    result = subprocess.run(
-        [
-            "git",
-            "-C",
-            str(repository),
-            "show",
-            f"{revision}:{path}",
-        ],
-        capture_output=True,
-        check=False,
-    )
+    while path not in seen:
+        if path.startswith("/") or ".." in Path(path).parts:
+            raise ValueError(f"Invalid license path: {path}")
 
-    if result.returncode != 0:
-        return None
+        seen.add(path)
 
-    return result.stdout
+        entry = subprocess.check_output(
+            ["git", "-C", str(repository), "ls-tree", "-z", revision, "--", path],
+        )
+
+        if not entry:
+            return None
+
+        metadata, separator, filename = entry.split(b"\0", 1)[0].partition(b"\t")
+
+        if not separator or filename.decode("utf-8") != path:
+            return None
+
+        result = subprocess.run(
+            ["git", "-C", str(repository), "show", f"{revision}:{path}"],
+            capture_output=True,
+            check=False,
+        )
+
+        if result.returncode != 0:
+            return None
+
+        if metadata.split(b" ", 1)[0] != b"120000":
+            return result.stdout
+
+        path = posixpath.normpath(posixpath.join(posixpath.dirname(path), result.stdout.decode("utf-8")))
+
+    raise ValueError(f"Cyclic license symlink: {path}")
 
 
 def audit_recipe(
