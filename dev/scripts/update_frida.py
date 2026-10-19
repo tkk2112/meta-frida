@@ -13,7 +13,7 @@ from collections.abc import Mapping
 from pathlib import Path
 from typing import Any
 from urllib.error import HTTPError, URLError
-from urllib.parse import urlparse
+from urllib.parse import urljoin, urlparse, urlsplit
 from urllib.request import Request, urlopen
 
 from git import Git, Repo
@@ -296,6 +296,23 @@ def clone_revision(
     return repo
 
 
+def resolve_submodule_url(repo: Repo, url: str) -> str:
+    if "://" in url:
+        return url
+
+    if not url.startswith(("./", "../")):
+        raise RuntimeError(f"Unsupported submodule URL: {url!r}")
+
+    origin = repo.remotes.origin.url
+    parsed = urlsplit(origin)
+
+    if parsed.scheme not in ("http", "https") or not parsed.netloc:
+        raise RuntimeError(f"Unsupported parent repository URL: {origin!r}")
+
+    base = origin.rstrip("/") + "/"
+    return urljoin(base, url)
+
+
 def submodule_info(
     repo: Repo,
     path: str,
@@ -304,16 +321,10 @@ def submodule_info(
         if module.path != path:
             continue
 
-        url = module.url
         revision = module.hexsha
-
         validate_revision(path, revision)
 
-        if "://" not in url:
-            msg = f"{path}: relative submodule URL {url!r} is not supported; expected an absolute URL"
-            raise RuntimeError(msg)
-
-        return url, revision
+        return resolve_submodule_url(repo, module.url), revision
 
     msg = f"{path!r} is not a Git submodule in {repo.working_tree_dir}"
     raise RuntimeError(msg)
@@ -339,12 +350,8 @@ def component_submodules(
             msg = f"duplicate Frida component identifier: {identifier}"
             raise RuntimeError(msg)
 
-        if "://" not in module.url:
-            msg = f"{path}: relative submodule URL {module.url!r} is not supported; expected an absolute URL"
-            raise RuntimeError(msg)
-
         components[identifier] = (
-            module.url,
+            resolve_submodule_url(repo, module.url),
             revision,
         )
 

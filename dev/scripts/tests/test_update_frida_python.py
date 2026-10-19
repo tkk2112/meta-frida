@@ -4,7 +4,7 @@ import sys
 import tempfile
 import unittest
 from pathlib import Path
-from unittest.mock import patch
+from unittest.mock import Mock, patch
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 
@@ -158,6 +158,12 @@ class TestFridaPythonUpdate(unittest.TestCase):
 
         assert assignments["FRIDA_VERSION"] == self.VERSION
         assert assignments["FRIDA_PYTHON_SHA256"] == self.CHECKSUM
+
+    def test_relative_submodule_url(self):
+        repo = Mock()
+        repo.remotes.origin.url = "https://github.com/frida/glib.git"
+
+        assert updater.resolve_submodule_url(repo, "../../GNOME/gvdb.git") == "https://github.com/GNOME/gvdb.git"
 
 
 if __name__ == "__main__":
