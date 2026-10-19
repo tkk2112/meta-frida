@@ -75,16 +75,11 @@ do_install:append() {
     fi
 }
 
-FILES:${PN}-staticdev += "\
-    ${FRIDA_DEPS_PREFIX}/lib/*.a \
-"
-
-FILES:${PN}:append:class-nativesdk = " \
-    ${FRIDA_DEPS_PREFIX}/lib/*.so.* \
+FILES:${PN}:append = " \
     ${FRIDA_DEPS_PREFIX}/lib/gio \
 "
 
-FILES:${PN}-dev:append:class-nativesdk = " \
+FILES:${PN}-dev:append = " \
     ${FRIDA_DEPS_PREFIX}/bin \
     ${FRIDA_DEPS_PREFIX}/include \
     ${FRIDA_DEPS_PREFIX}/lib/*.so \
@@ -92,4 +87,12 @@ FILES:${PN}-dev:append:class-nativesdk = " \
     ${FRIDA_DEPS_PREFIX}/lib/pkgconfig \
     ${FRIDA_DEPS_PREFIX}/libexec \
     ${FRIDA_DEPS_PREFIX}/share \
+"
+
+FILES:${PN}-staticdev:append = " \
+    ${FRIDA_DEPS_PREFIX}/lib/*.a \
+"
+
+FILES:${PN}:append:class-nativesdk = " \
+    ${FRIDA_DEPS_PREFIX}/lib/*.so.* \
 "
