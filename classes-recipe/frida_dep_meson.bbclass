@@ -5,6 +5,8 @@ inherit frida_meson
 FRIDA_MESON_SKIP_ARGS ??= ""
 FRIDA_MESON_OPTIMIZED ??= "${@'0' if d.getVar('DEBUG_BUILD') == '1' else '1'}"
 
+LDFLAGS:append:class-nativesdk = " -Wl,-rpath-link,${STAGING_LIBDIR}/frida/lib"
+
 def frida_meson_condition(expression, d):
     import ast
 

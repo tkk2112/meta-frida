@@ -29,17 +29,10 @@ SRCREV_FORMAT = "glib_gvdb"
 
 PKG_CONFIG_PATH:prepend = "${STAGING_LIBDIR}/frida/lib/pkgconfig:"
 
-EXTRA_OEMESON:append = "\
-    --libexecdir=libexec \
-"
-
-FILES:${PN}-dev += "\
-    ${FRIDA_DEPS_PREFIX} \
-"
-
-FILES:${PN}-staticdev += "\
-    ${FRIDA_DEPS_PREFIX}/lib/*.a \
-"
+EXTRA_OEMESON:append = " --libexecdir=libexec"
+# SDK host: Frida Core and language bindings must use one GLib instance.
+EXTRA_OEMESON:remove:class-nativesdk = "-Ddefault_library=static"
+EXTRA_OEMESON:append:class-nativesdk = " -Ddefault_library=shared"
 
 do_configure:prepend() {
     for dependency in libffi libpcre2-8 zlib; do
@@ -53,14 +46,19 @@ do_configure:prepend() {
     done
 }
 
+FRIDA_GLIB_LIBRARY_SUFFIX = "a"
+FRIDA_GLIB_LIBRARY_SUFFIX:class-nativesdk = "so"
+
 do_install:append() {
-    for library in \
-        libglib-2.0.a \
-        libgobject-2.0.a \
-        libgio-2.0.a \
-        libgmodule-2.0.a \
-        libgthread-2.0.a
+    for name in \
+        glib-2.0 \
+        gobject-2.0 \
+        gio-2.0 \
+        gmodule-2.0 \
+        gthread-2.0
     do
+        library="lib${name}.${FRIDA_GLIB_LIBRARY_SUFFIX}"
+
         test -f "${D}${FRIDA_DEPS_PREFIX}/lib/$library" || \
             bbfatal "Missing private GLib library: $library"
     done
@@ -76,3 +74,22 @@ do_install:append() {
         bbfatal "frida-glib installed a public library"
     fi
 }
+
+FILES:${PN}-staticdev += "\
+    ${FRIDA_DEPS_PREFIX}/lib/*.a \
+"
+
+FILES:${PN}:append:class-nativesdk = " \
+    ${FRIDA_DEPS_PREFIX}/lib/*.so.* \
+    ${FRIDA_DEPS_PREFIX}/lib/gio \
+"
+
+FILES:${PN}-dev:append:class-nativesdk = " \
+    ${FRIDA_DEPS_PREFIX}/bin \
+    ${FRIDA_DEPS_PREFIX}/include \
+    ${FRIDA_DEPS_PREFIX}/lib/*.so \
+    ${FRIDA_DEPS_PREFIX}/lib/glib-2.0 \
+    ${FRIDA_DEPS_PREFIX}/lib/pkgconfig \
+    ${FRIDA_DEPS_PREFIX}/libexec \
+    ${FRIDA_DEPS_PREFIX}/share \
+"
