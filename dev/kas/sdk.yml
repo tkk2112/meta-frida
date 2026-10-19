@@ -3,10 +3,20 @@ header:
   includes:
     - dev/kas/base.yml
 
+repos:
+  meta-openembedded:
+    url: https://github.com/openembedded/meta-openembedded.git
+    branch: wrynose
+    commit: 47d7dbdd10890bbd429bc0cccbe14435c37e5af1
+    layers:
+      meta-oe:
+      meta-python:
+
 local_conf_header:
   frida-sdk: |
     TOOLCHAIN_HOST_TASK:append = "\
         nativesdk-frida-core \
         nativesdk-frida-core-dev \
         nativesdk-frida-core-host-smoketest \
+        nativesdk-frida-host-tools \
     "
