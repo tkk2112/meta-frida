@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import argparse
 import hashlib
 import os
 import re
@@ -14,7 +15,6 @@ from pathlib import Path
 from urllib.parse import urlsplit
 
 ROOT = Path(__file__).resolve().parents[2]
-LOCK = ROOT / "conf/include/frida_lock.inc"
 
 ASSIGNMENT = re.compile(
     r'^([A-Za-z_][A-Za-z_0-9-]*(?:\[[^]]+\])?)\s*=\s*"([^"]*)"$',
@@ -219,17 +219,16 @@ def audit_recipe(
     return issues
 
 
-def audit_locked_dependencies(
-    root: Path = ROOT,
-) -> list[LicenseIssue]:
+def managed_dependencies(
+    root: Path,
+) -> tuple[list[tuple[Path, str, str, str]], list[LicenseIssue]]:
     lock = assignments((root / "conf/include/frida_lock.inc").read_text(encoding="utf-8"))
 
     issues: list[LicenseIssue] = []
+    managed: list[tuple[Path, str, str, str]] = []
 
     recipes = sorted((root / "recipes-frida").glob("frida-*/*.bb"))
     recipes += sorted((root / "recipes-devtools").glob("frida-*/*.bb"))
-
-    managed: list[tuple[Path, str, str, str]] = []
 
     for recipe in recipes:
         identifier = recipe.parent.name.removeprefix("frida-")
@@ -251,51 +250,86 @@ def audit_locked_dependencies(
 
         managed.append((recipe, identifier, uri, revision))
 
+    return managed, issues
+
+
+def print_audit_progress(
+    root: Path,
+    recipe: Path,
+    found: list[LicenseIssue],
+    completed: int,
+    total: int,
+    elapsed: float,
+) -> None:
+    relative = recipe.relative_to(root)
+    status = "REVIEW" if found else "OK"
+
+    print(
+        f"  [{completed:02d}/{total:02d}] {status:<7} {relative} ({elapsed:.1f}s)",
+        flush=True,
+    )
+
+    for issue in found:
+        print(
+            f"      {issue.source}: {issue.message}",
+            flush=True,
+        )
+
+
+def check_one(
+    recipe: Path,
+    identifier: str,
+    uri: str,
+    revision: str,
+    cache: Path,
+) -> tuple[list[LicenseIssue], float]:
+    start = time.monotonic()
+    repository = cache / identifier
+
+    try:
+        git_source(
+            source_uri(uri),
+            revision,
+            repository,
+        )
+        found = audit_recipe(
+            recipe,
+            repository,
+            revision,
+        )
+    except (
+        OSError,
+        RuntimeError,
+        ValueError,
+        subprocess.CalledProcessError,
+    ) as exc:
+        found = [
+            LicenseIssue(
+                recipe,
+                "",
+                f"Audit failed: {exc}",
+            )
+        ]
+
+    return found, time.monotonic() - start
+
+
+def audit_locked_dependencies(
+    root: Path = ROOT,
+    *,
+    verbose: bool = False,
+) -> list[LicenseIssue]:
+    managed, issues = managed_dependencies(root)
+
     total = len(managed)
     workers = min(total, os.cpu_count() or 1) if total else 1
     started = time.monotonic()
 
-    print(
-        f"\nFrida license audit: {total} dependencies, {workers} parallel workers",
-        flush=True,
-    )
-
-    def check_one(
-        recipe: Path,
-        identifier: str,
-        uri: str,
-        revision: str,
-        cache: Path,
-    ) -> tuple[list[LicenseIssue], float]:
-        start = time.monotonic()
-        repository = cache / identifier
-
-        try:
-            git_source(
-                source_uri(uri),
-                revision,
-                repository,
-            )
-            found = audit_recipe(
-                recipe,
-                repository,
-                revision,
-            )
-        except (
-            OSError,
-            RuntimeError,
-            ValueError,
-            subprocess.CalledProcessError,
-        ) as exc:
-            found = [
-                LicenseIssue(
-                    recipe,
-                    "",
-                    f"Audit failed: {exc}",
-                )
-            ]
-
-        return found, time.monotonic() - start
+    if verbose:
+        print(
+            f"\nFrida license audit: {total} dependencies, {workers} parallel workers",
+            flush=True,
+        )
 
     with tempfile.TemporaryDirectory(prefix="frida-license-") as temporary:
         cache = Path(temporary)
@@ -317,10 +351,11 @@ def audit_locked_dependencies(
                 )
                 futures[future] = recipe
 
-                print(
-                    f"  QUEUED  {recipe.relative_to(root)} ({revision[:12]})",
-                    flush=True,
-                )
+                if verbose:
+                    print(
+                        f"  QUEUED  {recipe.relative_to(root)} ({revision[:12]})",
+                        flush=True,
+                    )
 
             for completed, future in enumerate(
                 as_completed(futures),
@@ -330,24 +365,8 @@ def audit_locked_dependencies(
                 found, elapsed = future.result()
                 issues.extend(found)
 
-                relative = recipe.relative_to(root)
-
-                if found:
-                    print(
-                        f"  [{completed:02d}/{total:02d}] REVIEW  {relative} ({elapsed:.1f}s)",
-                        flush=True,
-                    )
-
-                    for issue in found:
-                        print(
-                            f"      {issue.source}: {issue.message}",
-                            flush=True,
-                        )
-                else:
-                    print(
-                        f"  [{completed:02d}/{total:02d}] OK      {relative} ({elapsed:.1f}s)",
-                        flush=True,
-                    )
+                if verbose:
+                    print_audit_progress(root, recipe, found, completed, total, elapsed)
 
     duration = time.monotonic() - started
 
@@ -359,41 +378,44 @@ def audit_locked_dependencies(
         )
     )
 
-    print(
-        f"\nLicense audit finished: {total} dependencies, {len(issues)} issue(s), {duration:.1f}s",
-        flush=True,
-    )
+    if verbose:
+        print(
+            f"\nLicense audit finished: {total} dependencies, {len(issues)} issue(s), {duration:.1f}s",
+            flush=True,
+        )
 
     return issues
 
 
-def check_licenses(root: Path = ROOT) -> None:
-    issues = audit_locked_dependencies(root)
+def check_licenses(root: Path = ROOT, *, verbose: bool = False) -> None:
+    issues = audit_locked_dependencies(root, verbose=verbose)
 
     if not issues:
-        print(
-            "\nPASS: Frida dependency license checksums",
-            flush=True,
-        )
+        print("PASS: Frida dependency license checksums", flush=True)
         return
 
-    print(
-        "\nFrida license audit: REVIEW REQUIRED\n",
-        flush=True,
-    )
+    print("\nFrida license audit: REVIEW REQUIRED\n", flush=True)
 
     for issue in issues:
-        print(
-            f"  {issue.recipe.relative_to(root)}",
-            flush=True,
-        )
-        print(
-            f"    {issue.source}: {issue.message}",
-            flush=True,
-        )
+        print(f"  {issue.recipe.relative_to(root)}", flush=True)
+        print(f"    {issue.source}: {issue.message}", flush=True)
 
     raise RuntimeError(f"{len(issues)} license metadata issue(s); review required")
 
 
 if __name__ == "__main__":
-    check_licenses()
+    parser = argparse.ArgumentParser(
+        description="Verify license checksums against pinned Frida dependency sources",
+    )
+    parser.add_argument(
+        "-v",
+        "--verbose",
+        action="store_true",
+        help="show per-dependency progress",
+    )
+    args = parser.parse_args()
+
+    try:
+        check_licenses(verbose=args.verbose)
+    except RuntimeError as exc:
+        raise SystemExit(f"error: {exc}") from None

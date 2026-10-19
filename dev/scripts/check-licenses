@@ -1,0 +1,16 @@
+#!/bin/sh
+
+set -eu
+
+SCRIPT_DIR="$(CDPATH= cd -- "$(dirname -- "$0")" && pwd)"
+
+# shellcheck source=lib/bootstrap.sh
+. "$SCRIPT_DIR/lib/bootstrap.sh"
+
+require_uv
+
+exec uv run \
+    --project "$UV_PROJECT" \
+    --python "$PYTHON_VERSION" \
+    --frozen \
+    python "$SCRIPT_DIR/frida_license_audit.py" "$@"
