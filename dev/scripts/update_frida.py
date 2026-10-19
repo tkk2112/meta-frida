@@ -27,6 +27,9 @@ LOCK_FILE = ROOT / "conf/include/frida_lock.inc"
 
 FRIDA_REPO_URL = "https://github.com/frida/frida.git"
 
+FRIDA_PYPI = "https://pypi.org/pypi/frida"
+SHA256_RE = re.compile(r"^[0-9a-f]{64}$")
+
 VERSION_RE = re.compile(r"^(\d+)\.(\d+)\.(\d+)$")
 
 LOCK_VERSION_RE = re.compile(
@@ -87,6 +90,70 @@ def read_lock_version() -> str:
     parse_version(version)
 
     return version
+
+
+def frida_python_metadata(version: str) -> dict[str, Any]:
+    parse_version(version)
+
+    url = f"{FRIDA_PYPI}/{version}/json"
+    request = Request(url, headers={"User-Agent": "meta-frida-update/1"})
+
+    try:
+        with urlopen(request, timeout=20) as response:
+            data = json.load(response)
+    except (HTTPError, URLError, TimeoutError, ValueError) as exc:
+        raise RuntimeError(f"failed to fetch Frida Python metadata from {url}") from exc
+
+    if not isinstance(data, dict):
+        raise TypeError(f"unexpected PyPI response from {url}")
+
+    if data.get("info", {}).get("version") != version:
+        raise RuntimeError(f"PyPI response does not match Frida {version}")
+
+    return data
+
+
+def frida_python_sdist_checksum(
+    data: Mapping[str, Any],
+    version: str,
+) -> str:
+    expected_filename = f"frida-{version}.tar.gz"
+
+    sdists = [item for item in data["urls"] if item.get("packagetype") == "sdist"]
+
+    if len(sdists) != 1:
+        raise RuntimeError(f"expected one Frida Python {version} source archive, found {len(sdists)}")
+
+    sdist = sdists[0]
+
+    if sdist.get("filename") != expected_filename:
+        raise RuntimeError(f"unexpected Frida Python source archive: {sdist.get('filename')!r}")
+
+    checksum = sdist.get("digests", {}).get("sha256")
+
+    if not isinstance(checksum, str) or not SHA256_RE.fullmatch(checksum):
+        raise RuntimeError(f"invalid Frida Python {version} source checksum")
+
+    return checksum
+
+
+def check_frida_python_checksum() -> None:
+    version = read_lock_version()
+    contents = LOCK_FILE.read_text(encoding="utf-8")
+    assignments = parse_lock_assignments(contents)
+
+    actual = assignments.get("FRIDA_PYTHON_SHA256")
+
+    if actual is None or not SHA256_RE.fullmatch(actual):
+        raise RuntimeError(f"FRIDA_PYTHON_SHA256 missing or invalid in {LOCK_FILE.relative_to(ROOT)}")
+
+    metadata = frida_python_metadata(version)
+    expected = frida_python_sdist_checksum(metadata, version)
+
+    if actual != expected:
+        raise RuntimeError(f"Frida Python {version} checksum mismatch: locked {actual}, PyPI {expected}")
+
+    print(f"OK: Frida Python {version} sdist SHA-256: {actual}")
 
 
 def frida_release_versions(*, verbose: bool) -> set[str]:
@@ -433,6 +500,7 @@ def bitbake_literal(value: str) -> str:
 def format_lock(
     *,
     version: str,
+    python_sha256: str,
     release_revision: str,
     releng_url: str,
     releng_revision: str,
@@ -449,6 +517,7 @@ def format_lock(
         "# Do not edit manually.",
         "",
         f'FRIDA_VERSION = "{version}"',
+        f'FRIDA_PYTHON_SHA256 = "{python_sha256}"',
         "",
         f'FRIDA_RELEASE_URI = "{bitbake_git_uri(FRIDA_REPO_URL)}"',
         f'FRIDA_RELEASE_SRCREV = "{release_revision}"',
@@ -658,8 +727,17 @@ def generate_lock(
         print("\nNested dependencies")
         print(f"  glib/gvdb            {gvdb_revision}")
 
+        print("\nResolving Frida Python source")
+        python_metadata = frida_python_metadata(version)
+        python_sha256 = frida_python_sdist_checksum(
+            python_metadata,
+            version,
+        )
+        print(f"  sdist SHA-256: {python_sha256}")
+
         return format_lock(
             version=version,
+            python_sha256=python_sha256,
             release_revision=release_revision,
             releng_url=releng_url,
             releng_revision=releng_revision,
@@ -708,6 +786,9 @@ def write_lock(
 
 def check_for_update(*, verbose: bool) -> None:
     current = read_lock_version()
+
+    check_frida_python_checksum()
+
     latest = latest_frida_version(verbose=verbose)
 
     current_key = parse_version(current)

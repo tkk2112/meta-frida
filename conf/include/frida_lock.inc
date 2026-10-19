@@ -4,6 +4,7 @@
 # Do not edit manually.
 
 FRIDA_VERSION = "17.23.0"
+FRIDA_PYTHON_SHA256 = "721284b8681eb745ac1e8ba20d99401121d8fcfce225efee5103f513d2752f13"
 
 FRIDA_RELEASE_URI = "git://github.com/frida/frida.git;protocol=https;nobranch=1"
 FRIDA_RELEASE_SRCREV = "81b38c48056fce9d6e5facd869740cf09c936173"

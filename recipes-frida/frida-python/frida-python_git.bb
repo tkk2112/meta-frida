@@ -12,14 +12,30 @@ DEPENDS = "\
     frida-core \
     python3-setuptools-native \
 "
+DEPENDS:append:class-nativesdk = " patchelf-native"
+
+require conf/include/frida_lock.inc
+
+PV = "${FRIDA_VERSION}"
 
 SRC_URI = "https://files.pythonhosted.org/packages/source/f/frida/frida-${PV}.tar.gz"
-SRC_URI[sha256sum] = "721284b8681eb745ac1e8ba20d99401121d8fcfce225efee5103f513d2752f13"
+SRC_URI[sha256sum] = "${FRIDA_PYTHON_SHA256}"
 SRC_URI:append = " file://0001-meson-resolve-GIR-paths-through-cross-sysroot.patch"
 
 S = "${UNPACKDIR}/frida-${PV}"
 
 inherit meson python3targetconfig frida_sdk
+
+do_install:append:class-nativesdk() {
+    for extension in "${D}${PYTHON_SITEPACKAGES_DIR}/frida"/_frida*.so; do
+        test -f "${extension}" || \
+            bbfatal "Frida Python extension not installed"
+
+        "${STAGING_BINDIR_NATIVE}/patchelf" \
+            --set-rpath '$ORIGIN/../../../frida/lib:$ORIGIN/../../..' \
+            "${extension}"
+    done
+}
 
 # The GIR files and shared library must come from our packaged Frida Core.
 EXTRA_OEMESON:append = " --wrap-mode=nodownload"
