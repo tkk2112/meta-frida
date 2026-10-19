@@ -2,17 +2,24 @@ from __future__ import annotations
 
 import argparse
 import importlib
+import json
+import os
 import re
+import subprocess
 import sys
 import tempfile
 import tomllib
 from collections.abc import Mapping
 from pathlib import Path
 from typing import Any
+from urllib.error import HTTPError, URLError
 from urllib.parse import urlparse
+from urllib.request import Request, urlopen
 
 from git import Git, Repo
 from git.exc import GitCommandError
+from packaging.requirements import Requirement
+from packaging.utils import canonicalize_name
 
 ROOT = Path(__file__).resolve().parents[2]
 
@@ -33,6 +40,24 @@ LOCK_ASSIGNMENT_RE = re.compile(
 )
 
 GIT_REVISION_RE = re.compile(r"^[0-9a-f]{40}$")
+
+TOOLS_RECIPES = ROOT / "recipes-frida/frida-tools"
+TOOLS_PYPI = "https://pypi.org/pypi/frida-tools"
+
+TOOLS_PACKAGES = {
+    "colorama": "nativesdk-python3-colorama",
+    "frida": "nativesdk-frida-python",
+    "prompt-toolkit": "nativesdk-python3-prompt-toolkit",
+    "pygments": "nativesdk-python3-pygments",
+    "websockets": "nativesdk-python3-websockets",
+}
+
+TOOLS_CHECKSUM_RE = re.compile(r'(?m)^SRC_URI\[sha256sum\]\s*=\s*"([0-9a-f]{64})"$')
+
+TOOLS_RDEPENDS_RE = re.compile(
+    r'RDEPENDS:\$\{PN\}:class-nativesdk\s*=\s*"([^"]*)"',
+    re.DOTALL,
+)
 
 
 def parse_version(version: str) -> tuple[int, int, int]:
@@ -702,6 +727,243 @@ def check_for_update(*, verbose: bool) -> None:
     print(f"\nLocked version {current} is newer than latest upstream release {latest}.")
 
 
+def tools_recipe() -> tuple[str, Path]:
+    matches = sorted(TOOLS_RECIPES.glob("frida-tools_*.bb"))
+
+    if len(matches) != 1:
+        msg = f"expected one versioned frida-tools recipe, found {len(matches)}"
+        raise RuntimeError(msg)
+
+    path = matches[0]
+    version = path.stem.removeprefix("frida-tools_")
+    parse_version(version)
+
+    return version, path
+
+
+def tools_metadata(version: str | None = None) -> dict[str, Any]:
+    url = f"{TOOLS_PYPI}/{version}/json" if version else f"{TOOLS_PYPI}/json"
+    request = Request(url, headers={"User-Agent": "meta-frida-update/1"})
+
+    try:
+        with urlopen(request, timeout=20) as response:
+            data = json.load(response)
+    except (HTTPError, URLError, TimeoutError, ValueError) as exc:
+        msg = f"failed to fetch PyPI metadata from {url}"
+        raise RuntimeError(msg) from exc
+
+    if not isinstance(data, dict):
+        raise TypeError(f"unexpected PyPI response from {url}")
+
+    return data
+
+
+def tools_requirements(data: Mapping[str, Any]) -> dict[str, Requirement]:
+    result: dict[str, Requirement] = {}
+
+    for item in data["info"]["requires_dist"] or []:
+        requirement = Requirement(item)
+
+        if requirement.marker is not None:
+            raise RuntimeError(f"review conditional frida-tools dependency: {item}")
+
+        name = canonicalize_name(requirement.name)
+
+        if name not in TOOLS_PACKAGES:
+            raise RuntimeError(f"review new frida-tools dependency: {item}")
+
+        if name in result:
+            raise RuntimeError(f"duplicate frida-tools dependency: {name}")
+
+        result[name] = requirement
+
+    if "frida" not in result:
+        raise RuntimeError("frida-tools release lacks a Frida requirement")
+
+    return result
+
+
+def tools_sdist_checksum(data: Mapping[str, Any]) -> str:
+    sdists = [item for item in data["urls"] if item["packagetype"] == "sdist"]
+
+    if len(sdists) != 1:
+        raise RuntimeError(f"expected one frida-tools source archive, found {len(sdists)}")
+
+    return str(sdists[0]["digests"]["sha256"])
+
+
+def validate_tools_recipe(
+    contents: str,
+    data: Mapping[str, Any],
+) -> None:
+    expected = tools_sdist_checksum(data)
+    actual = TOOLS_CHECKSUM_RE.search(contents)
+
+    if actual is None or actual.group(1) != expected:
+        raise RuntimeError(f"frida-tools source checksum differs from PyPI: {expected}")
+
+    deps = TOOLS_RDEPENDS_RE.search(contents)
+
+    if deps is None:
+        raise RuntimeError("frida-tools recipe lacks SDK-host RDEPENDS")
+
+    declared = " ".join(deps.group(1).replace("\\", " ").split())
+
+    for name, requirement in tools_requirements(data).items():
+        package = TOOLS_PACKAGES[name]
+
+        for constraint in requirement.specifier:
+            if constraint.operator not in {"<", "<=", "=", "==", ">", ">="}:
+                raise RuntimeError(f"unsupported BitBake constraint: {constraint}")
+
+            operator = "=" if constraint.operator == "==" else constraint.operator
+
+            expected_dep = f"{package} ({operator} {constraint.version})"
+
+            if expected_dep not in declared:
+                raise RuntimeError(f"frida-tools recipe lacks RDEPENDS: {expected_dep}")
+
+
+def selected_version(recipe: str) -> tuple[str, str]:
+    # BitBake must use the kas container's Python, not the updater venv.
+    environment = os.environ.copy()
+    environment.pop("VIRTUAL_ENV", None)
+    environment.pop("PYTHONHOME", None)
+    environment.pop("PYTHONPATH", None)
+
+    venv_bin = (Path(sys.prefix) / "bin").resolve()
+
+    environment["PATH"] = os.pathsep.join(
+        entry for entry in environment["PATH"].split(os.pathsep) if Path(entry).resolve() != venv_bin
+    )
+
+    # BitBake uses /usr/bin/env python3. Keep the system interpreter
+    # available even when the development venv was first in PATH.
+    system_python = Path("/usr/bin/python3")
+
+    if not system_python.is_file():
+        raise RuntimeError("the kas container does not provide /usr/bin/python3")
+
+    environment["PATH"] = f"{system_python.parent}{os.pathsep}{environment['PATH']}"
+
+    values = []
+
+    for variable in ("PV", "FILE"):
+        command = [
+            "bitbake-getvar",
+            "--value",
+            "-r",
+            recipe,
+            variable,
+        ]
+
+        try:
+            result = subprocess.run(
+                command,
+                check=True,
+                capture_output=True,
+                text=True,
+                env=environment,
+            )
+        except subprocess.CalledProcessError as exc:
+            details = (exc.stderr or exc.stdout or "").strip()
+            raise RuntimeError(
+                f"bitbake-getvar failed for {recipe} {variable} (exit {exc.returncode}):\n{details}"
+            ) from exc
+        except OSError as exc:
+            raise RuntimeError(f"failed to execute bitbake-getvar: {exc}") from exc
+
+        value = result.stdout.strip()
+
+        if not value:
+            raise RuntimeError(f"bitbake-getvar returned empty {variable} for {recipe}")
+
+        values.append(value)
+
+    return values[0], values[1]
+
+
+def check_tools(*, bitbake: bool) -> None:
+    current, path = tools_recipe()
+    data = tools_metadata(current)
+    latest = str(tools_metadata()["info"]["version"])
+
+    validate_tools_recipe(path.read_text(encoding="utf-8"), data)
+
+    if bitbake:
+        selected, origin = selected_version("nativesdk-frida-tools")
+
+        if selected != current:
+            raise RuntimeError(f"BitBake selected frida-tools {selected}, but meta-frida pins {current}: {origin}")
+
+        print(f"OK: selected frida-tools {selected} ({origin})")
+
+    print(f"Current Frida Tools: {current}")
+    print(f"Latest Frida Tools:  {latest}")
+
+    if parse_version(current) < parse_version(latest):
+        print(f"Update available: {current} -> {latest}")
+
+    for name, requirement in tools_requirements(data).items():
+        package = TOOLS_PACKAGES[name]
+
+        if bitbake:
+            version, origin = selected_version(package)
+        elif name == "frida":
+            version = read_lock_version()
+            origin = str(LOCK_FILE.relative_to(ROOT))
+        else:
+            print(f"UNCHECKED: {package} {requirement.specifier} (use --bitbake)")
+            continue
+
+        if version not in requirement.specifier:
+            raise RuntimeError(f"{package} {version} does not satisfy {requirement.specifier} ({origin})")
+
+        print(f"OK: {package} {version} satisfies {requirement.specifier} ({origin})")
+
+
+def update_tools(version: str | None) -> None:
+    data = tools_metadata(version)
+    target_version = str(data["info"]["version"])
+    parse_version(target_version)
+
+    current_version, path = tools_recipe()
+    original = path.read_text(encoding="utf-8")
+
+    checksum_match = TOOLS_CHECKSUM_RE.search(original)
+
+    if checksum_match is None:
+        raise RuntimeError(f"missing source checksum in {path}")
+
+    checksum = tools_sdist_checksum(data)
+
+    updated = original[: checksum_match.start(1)] + checksum + original[checksum_match.end(1) :]
+
+    validate_tools_recipe(updated, data)
+
+    frida_req = tools_requirements(data)["frida"]
+    frida_version = read_lock_version()
+
+    if frida_version not in frida_req.specifier:
+        raise RuntimeError(
+            f"frida-tools {target_version} requires frida {frida_req.specifier}, but Frida is locked to {frida_version}"
+        )
+
+    dest = path.with_name(f"frida-tools_{target_version}.bb")
+
+    if dest != path and dest.exists():
+        raise RuntimeError(f"destination recipe already exists: {dest}")
+
+    dest.write_text(updated, encoding="utf-8")
+
+    if dest != path:
+        path.unlink()
+
+    print(f"Frida Tools: {current_version} -> {target_version}")
+    print(f"Updated: {dest.relative_to(ROOT)}")
+    print("Review runtime dependencies and validate the SDK with --check-tools --bitbake")
+
+
 def main() -> None:
     parser = argparse.ArgumentParser(
         description="Update meta-frida source pins from Frida releases",
@@ -716,13 +978,33 @@ def main() -> None:
     parser.add_argument(
         "--check",
         action="store_true",
-        help="check whether a newer stable Frida release is available",
+        help="check Frida Core and Tools releases",
     )
 
     parser.add_argument(
         "--update",
         action="store_true",
-        help="update the lock to the latest stable Frida release",
+        help="update the Core lock to the latest stable Frida release",
+    )
+
+    parser.add_argument(
+        "--check-tools",
+        action="store_true",
+        help="check Frida Tools release and SDK dependency requirements",
+    )
+
+    parser.add_argument(
+        "--update-tools",
+        nargs="?",
+        const="latest",
+        metavar="VERSION",
+        help="update Frida Tools independently (default: latest)",
+    )
+
+    parser.add_argument(
+        "--bitbake",
+        action="store_true",
+        help="check versions selected by BitBake (use inside a kas shell)",
     )
 
     parser.add_argument(
@@ -739,14 +1021,27 @@ def main() -> None:
             args.version is not None,
             args.check,
             args.update,
+            args.check_tools,
+            args.update_tools is not None,
         )
     )
 
     if mode_count != 1:
-        parser.error("specify exactly one of VERSION, --check, or --update")
+        parser.error("select VERSION, --check, --update, --check-tools, or --update-tools")
+
+    if args.bitbake and not (args.check or args.check_tools):
+        parser.error("--bitbake requires --check or --check-tools")
 
     if args.check:
         check_for_update(verbose=args.verbose)
+        return
+
+    if args.check_tools:
+        check_tools(bitbake=args.bitbake)
+        return
+
+    if args.update_tools is not None:
+        update_tools(None if args.update_tools == "latest" else args.update_tools)
         return
 
     if args.update:
