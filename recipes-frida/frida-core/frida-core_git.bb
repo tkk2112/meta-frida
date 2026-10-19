@@ -24,6 +24,7 @@ DEPENDS = "\
     glib-2.0-native \
     python3-native \
 "
+DEPENDS:append:class-nativesdk = " patchelf-native"
 
 PV = "${FRIDA_VERSION}+git"
 
@@ -136,6 +137,16 @@ FILES:frida-server += "\
 do_install:append:class-target() {
     test -f "${D}${bindir}/frida-server" || \
         bbfatal "frida-server was not installed"
+}
+do_install:append:class-nativesdk() {
+    library="${D}${libdir}/libfrida-core-1.0.so"
+
+    test -f "${library}" || \
+        bbfatal "Frida Core shared library not installed"
+
+    "${STAGING_BINDIR_NATIVE}/patchelf" \
+        --set-rpath '$ORIGIN/frida/lib' \
+        "${library}"
 }
 
 FILES:${PN} += "\

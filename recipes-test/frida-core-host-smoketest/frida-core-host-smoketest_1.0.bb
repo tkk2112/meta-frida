@@ -18,4 +18,6 @@ S = "${UNPACKDIR}"
 
 inherit meson frida_sdk
 
+LDFLAGS:append:class-nativesdk = " -Wl,-rpath-link,${STAGING_LIBDIR}/frida/lib"
+
 BBCLASSEXTEND = "nativesdk"
