@@ -1,4 +1,8 @@
+# SPDX-License-Identifier: MIT
+
 SUMMARY = "Deterministic target for Frida runtime smoke testing"
+DESCRIPTION = "Provides a controlled executable with known functions for Frida attachment and interception tests."
+
 LICENSE = "CLOSED"
 
 SRC_URI = "\

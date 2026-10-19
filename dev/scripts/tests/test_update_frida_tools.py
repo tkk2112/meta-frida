@@ -8,6 +8,7 @@ from unittest.mock import patch
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 
+import pytest
 import update_frida as updater
 
 
@@ -48,16 +49,11 @@ class TestFridaToolsUpdate(unittest.TestCase):
         text = f'SRC_URI[sha256sum] = "{"a" * 64}"\n'
         text += 'RDEPENDS:${PN}:class-nativesdk = "\\\n'
 
-        for name, requirement in updater.tools_requirements(
-            self.data
-        ).items():
+        for name, requirement in updater.tools_requirements(self.data).items():
             package = updater.TOOLS_PACKAGES[name]
 
             for specifier in requirement.specifier:
-                text += (
-                    f"    {package} "
-                    f"({specifier.operator} {specifier.version}) \\\n"
-                )
+                text += f"    {package} ({specifier.operator} {specifier.version}) \\\n"
 
         text += '"\n'
         self.recipe.write_text(text)
@@ -74,7 +70,7 @@ class TestFridaToolsUpdate(unittest.TestCase):
         metadata = patch.object(
             updater,
             "tools_metadata",
-            side_effect=lambda version=None: self.data,
+            side_effect=lambda _version=None: self.data,
         )
         metadata.start()
         self.addCleanup(metadata.stop)
@@ -90,9 +86,7 @@ class TestFridaToolsUpdate(unittest.TestCase):
         )
         self.recipe.write_text(contents)
 
-        with self.assertRaisesRegex(
-            RuntimeError, "nativesdk-python3-websockets"
-        ):
+        with pytest.raises(RuntimeError, match="nativesdk-python3-websockets"):
             updater.check_tools(bitbake=False)
 
     def test_incompatible_selected_websockets(self):
@@ -108,13 +102,11 @@ class TestFridaToolsUpdate(unittest.TestCase):
         def selected(name):
             return versions[name], f"/recipes/{name}.bb"
 
-        with patch.object(
-            updater, "selected_version", side_effect=selected
+        with (
+            patch.object(updater, "selected_version", side_effect=selected),
+            pytest.raises(RuntimeError, match="does not satisfy"),
         ):
-            with self.assertRaisesRegex(
-                RuntimeError, "does not satisfy"
-            ):
-                updater.check_tools(bitbake=True)
+            updater.check_tools(bitbake=True)
 
     def test_update_rejects_incompatible_core(self):
         incompatible = {
@@ -130,23 +122,17 @@ class TestFridaToolsUpdate(unittest.TestCase):
             ],
         }
 
-        with patch.object(
-            updater, "tools_metadata", return_value=incompatible
-        ):
-            with self.assertRaises(RuntimeError):
-                updater.update_tools("14.12.0")
+        with patch.object(updater, "tools_metadata", return_value=incompatible), pytest.raises(RuntimeError):
+            updater.update_tools("14.12.0")
 
-        self.assertTrue(self.recipe.exists())
-
+        assert self.recipe.exists()
 
     def test_bitbake_uses_container_python(self):
         import subprocess
 
         results = [
             subprocess.CompletedProcess([], 0, "14.11.0\n", ""),
-            subprocess.CompletedProcess(
-                [], 0, "/repo/frida-tools_14.11.0.bb\n", ""
-            ),
+            subprocess.CompletedProcess([], 0, "/repo/frida-tools_14.11.0.bb\n", ""),
         ]
 
         venv = Path(sys.prefix) / "bin"
@@ -165,17 +151,15 @@ class TestFridaToolsUpdate(unittest.TestCase):
                 side_effect=results,
             ) as run,
         ):
-            version, origin = updater.selected_version(
-                "nativesdk-frida-tools"
-            )
+            version, origin = updater.selected_version("nativesdk-frida-tools")
 
-        self.assertEqual(version, "14.11.0")
-        self.assertEqual(origin, "/repo/frida-tools_14.11.0.bb")
+        assert version == "14.11.0"
+        assert origin == "/repo/frida-tools_14.11.0.bb"
 
         for call in run.call_args_list:
             environment = call.kwargs["env"]
-            self.assertNotIn(str(venv), environment["PATH"].split(":"))
-            self.assertNotIn("VIRTUAL_ENV", environment)
+            assert str(venv) not in environment["PATH"].split(":")
+            assert "VIRTUAL_ENV" not in environment
 
 
 if __name__ == "__main__":

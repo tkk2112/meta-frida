@@ -45,6 +45,7 @@ version = "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb"
 
             lock = MODULE["format_lock"](
                 version="17.23.0",
+                python_sha256="721284b8681eb745ac1e8ba20d99401121d8fcfce225efee5103f513d2752f13",
                 release_revision="c" * 40,
                 releng_url="https://github.com/frida/releng.git",
                 releng_revision="d" * 40,

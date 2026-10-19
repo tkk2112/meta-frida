@@ -8,6 +8,9 @@ from unittest.mock import patch
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 
+from typing import Any
+
+import pytest
 import update_frida as updater
 
 
@@ -31,7 +34,7 @@ class TestFridaPythonUpdate(unittest.TestCase):
         self.addCleanup(root_patch.stop)
         self.addCleanup(lock_patch.stop)
 
-        self.metadata = {
+        self.metadata: dict[str, Any] = {
             "info": {"version": self.VERSION},
             "urls": [
                 {
@@ -50,16 +53,13 @@ class TestFridaPythonUpdate(unittest.TestCase):
     def write_lock(self, checksum=None):
         checksum = self.CHECKSUM if checksum is None else checksum
         self.lock.write_text(
-            f'FRIDA_VERSION = "{self.VERSION}"\n'
-            f'FRIDA_PYTHON_SHA256 = "{checksum}"\n',
+            f'FRIDA_VERSION = "{self.VERSION}"\nFRIDA_PYTHON_SHA256 = "{checksum}"\n',
             encoding="utf-8",
         )
 
     def test_selects_sdist_not_wheel(self):
-        result = updater.frida_python_sdist_checksum(
-            self.metadata, self.VERSION
-        )
-        self.assertEqual(result, self.CHECKSUM)
+        result = updater.frida_python_sdist_checksum(self.metadata, self.VERSION)
+        assert result == self.CHECKSUM
 
     def test_rejects_missing_sdist(self):
         data = {
@@ -67,7 +67,7 @@ class TestFridaPythonUpdate(unittest.TestCase):
             "urls": [self.metadata["urls"][0]],
         }
 
-        with self.assertRaisesRegex(RuntimeError, "source archive"):
+        with pytest.raises(RuntimeError, match="source archive"):
             updater.frida_python_sdist_checksum(data, self.VERSION)
 
     def test_rejects_duplicate_sdist(self):
@@ -77,7 +77,7 @@ class TestFridaPythonUpdate(unittest.TestCase):
             "urls": [sdist, sdist],
         }
 
-        with self.assertRaisesRegex(RuntimeError, "found 2"):
+        with pytest.raises(RuntimeError, match="found 2"):
             updater.frida_python_sdist_checksum(data, self.VERSION)
 
     def test_rejects_wrong_filename(self):
@@ -91,7 +91,7 @@ class TestFridaPythonUpdate(unittest.TestCase):
             ],
         }
 
-        with self.assertRaisesRegex(RuntimeError, "unexpected"):
+        with pytest.raises(RuntimeError, match="unexpected"):
             updater.frida_python_sdist_checksum(data, self.VERSION)
 
     def test_rejects_invalid_checksum(self):
@@ -105,7 +105,7 @@ class TestFridaPythonUpdate(unittest.TestCase):
             ],
         }
 
-        with self.assertRaisesRegex(RuntimeError, "invalid"):
+        with pytest.raises(RuntimeError, match="invalid"):
             updater.frida_python_sdist_checksum(data, self.VERSION)
 
     def test_check_accepts_matching_checksum(self):
@@ -121,13 +121,15 @@ class TestFridaPythonUpdate(unittest.TestCase):
     def test_check_rejects_mismatch(self):
         self.write_lock("a" * 64)
 
-        with patch.object(
-            updater,
-            "frida_python_metadata",
-            return_value=self.metadata,
+        with (
+            patch.object(
+                updater,
+                "frida_python_metadata",
+                return_value=self.metadata,
+            ),
+            pytest.raises(RuntimeError, match="checksum mismatch"),
         ):
-            with self.assertRaisesRegex(RuntimeError, "checksum mismatch"):
-                updater.check_frida_python_checksum()
+            updater.check_frida_python_checksum()
 
     def test_check_rejects_missing_pin(self):
         self.lock.write_text(
@@ -135,7 +137,7 @@ class TestFridaPythonUpdate(unittest.TestCase):
             encoding="utf-8",
         )
 
-        with self.assertRaisesRegex(RuntimeError, "missing or invalid"):
+        with pytest.raises(RuntimeError, match="missing or invalid"):
             updater.check_frida_python_checksum()
 
     def test_generated_lock_contains_checksum(self):
@@ -154,13 +156,9 @@ class TestFridaPythonUpdate(unittest.TestCase):
 
         assignments = updater.parse_lock_assignments(contents)
 
-        self.assertEqual(assignments["FRIDA_VERSION"], self.VERSION)
-        self.assertEqual(
-            assignments["FRIDA_PYTHON_SHA256"],
-            self.CHECKSUM,
-        )
+        assert assignments["FRIDA_VERSION"] == self.VERSION
+        assert assignments["FRIDA_PYTHON_SHA256"] == self.CHECKSUM
 
 
 if __name__ == "__main__":
     unittest.main()
-

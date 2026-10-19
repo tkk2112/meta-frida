@@ -2,6 +2,7 @@
 
 SUMMARY = "Frida Gum ARM64 instrumentation smoke test"
 DESCRIPTION = "Verifies static linking, function replacement and revert using the Gum C API."
+
 LICENSE = "MIT"
 LIC_FILES_CHKSUM = "file://${COMMON_LICENSE_DIR}/MIT;md5=0835ade698e0bcf8506ecda2f7b4f302"
 
