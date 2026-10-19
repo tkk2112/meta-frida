@@ -152,3 +152,7 @@ FILES:${PN}:append:class-nativesdk = " ${libdir}/frida-1.0"
 # Frida Core installs an unversioned shared library, not a .so symlink.
 SOLIBS:class-nativesdk = ".so"
 FILES_SOLIBSDEV:class-nativesdk = ""
+
+# SDK-host tools connect to frida-server remotely.
+EXTRA_OEMESON:remove:class-nativesdk = "-Dlocal_backend=enabled"
+EXTRA_OEMESON:append:class-nativesdk = " -Dlocal_backend=disabled"
