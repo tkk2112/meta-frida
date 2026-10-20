@@ -9,7 +9,7 @@ LIC_FILES_CHKSUM = "file://COPYING;md5=41890f71f740302b785c27661123bff5"
 
 DEPENDS = "frida-glib"
 
-PV = "1.8.0+git"
+PV = "${@d.getVarFlag('FRIDA_DEP_VERSION', 'json-glib')}+git"
 
 inherit frida_dep_meson
 

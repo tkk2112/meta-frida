@@ -13,7 +13,7 @@ DEPENDS += "\
     frida-zlib \
 "
 
-PV = "2.75.0+git"
+PV = "${@d.getVarFlag('FRIDA_DEP_VERSION', 'glib')}+git"
 
 inherit frida_dep_meson
 
@@ -29,7 +29,10 @@ SRCREV_FORMAT = "glib_gvdb"
 
 PKG_CONFIG_PATH:prepend = "${STAGING_LIBDIR}/frida/lib/pkgconfig:"
 
-EXTRA_OEMESON:append = " --libexecdir=libexec"
+EXTRA_OEMESON:append = " \
+    -Dintrospection=disabled \
+    --libexecdir=libexec \
+"
 # SDK host: Frida Core and language bindings must use one GLib instance.
 EXTRA_OEMESON:remove:class-nativesdk = "-Ddefault_library=static"
 EXTRA_OEMESON:append:class-nativesdk = " -Ddefault_library=shared"

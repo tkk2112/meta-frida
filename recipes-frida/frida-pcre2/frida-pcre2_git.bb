@@ -5,7 +5,7 @@ DESCRIPTION = "Frida-pinned PCRE2 built as a private static dependency."
 HOMEPAGE = "https://github.com/frida/pcre2"
 
 LICENSE = "BSD-3-Clause"
-LIC_FILES_CHKSUM = "file://LICENCE;md5=41bfb977e4933c506588724ce69bf5d2"
+LIC_FILES_CHKSUM = "file://LICENCE.md;md5=6720bf3bcff57543b915c2b22e526df0"
 
 PV = "10.41+git"
 

@@ -6,7 +6,7 @@ HOMEPAGE = "https://github.com/frida/libdwarf"
 LICENSE = "LGPL-2.1-only & BSD-2-Clause"
 LIC_FILES_CHKSUM = "file://COPYING;beginline=1;endline=1;md5=21a5726f87126c2003b0bf3c9c6106ba"
 
-PV = "0.11.2+git"
+PV = "${@d.getVarFlag('FRIDA_DEP_VERSION', 'libdwarf')}+git"
 
 inherit frida_dep_meson
 

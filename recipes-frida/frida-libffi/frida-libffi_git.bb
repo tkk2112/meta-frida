@@ -5,7 +5,9 @@ DESCRIPTION = "Frida-patched libffi built as a private static dependency."
 HOMEPAGE = "https://github.com/frida/libffi"
 
 LICENSE = "MIT"
-LIC_FILES_CHKSUM = "file://LICENSE;md5=32c0d09a0641daf4903e5d61cc8f23a8"
+LIC_FILES_CHKSUM = "file://LICENSE;md5=5e9a8df556846bb3d1edec0d968a2311"
+
+PV = "${@d.getVarFlag('FRIDA_DEP_VERSION', 'libffi')}+git"
 
 inherit frida_dep_meson
 

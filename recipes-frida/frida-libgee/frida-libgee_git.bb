@@ -17,7 +17,7 @@ DEPENDS:class-native = "\
     glib-2.0-native \
 "
 
-PV = "0.20.6+git"
+PV = "${@d.getVarFlag('FRIDA_DEP_VERSION', 'libgee')}+git"
 
 SRC_URI:append = " \
     file://frida-valac \

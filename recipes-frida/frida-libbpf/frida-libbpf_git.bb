@@ -5,7 +5,7 @@ DESCRIPTION = "Frida-pinned libbpf built as a private static dependency."
 HOMEPAGE = "https://github.com/frida/libbpf"
 
 LICENSE = "LGPL-2.1-only | BSD-2-Clause"
-LIC_FILES_CHKSUM = "file://LICENSE;md5=ef85bb9c22630a7bfbcbbea6ec81ac72"
+LIC_FILES_CHKSUM = "file://LICENSE;md5=0343d2dcd485e8d561110945595cf0dd"
 
 DEPENDS = "\
     elfutils \

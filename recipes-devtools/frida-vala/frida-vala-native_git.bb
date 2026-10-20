@@ -13,7 +13,7 @@ DEPENDS = "\
     glib-2.0-native \
 "
 
-PV = "0.58.0+git"
+PV = "${@d.getVarFlag('FRIDA_DEP_VERSION', 'vala')}+git"
 
 inherit frida_dep_meson vala
 inherit_defer native

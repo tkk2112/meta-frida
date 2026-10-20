@@ -5,7 +5,7 @@ DESCRIPTION = "Frida-pinned libpsl built as a private static dependency."
 HOMEPAGE = "https://github.com/frida/libpsl"
 
 LICENSE = "MIT"
-LIC_FILES_CHKSUM = "file://LICENSE;md5=5437030d9e4fbe7267ced058ddb8a7f5"
+LIC_FILES_CHKSUM = "file://LICENSE;md5=49296c1806ef92c28297fb264163d81e"
 
 PV = "1.0+git"
 
